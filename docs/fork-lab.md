@@ -80,12 +80,29 @@ to the SYSTEM SID. Source inspection shows an identity-aliasing problem
 in verifyPrivate: an ACE matching the user takes the first branch of an
 if/else-if, so the separate SYSTEM flag cannot be set when both SIDs
 coincide. However the **observed** error occurs at the preceding
-AceCount==2 check, before that branch. Whether Windows collapses duplicate
-SID ACEs or changes the returned DACL still needs a rebuilt addon and
-independent ACL readback to confirm. A read-only sweep found no surviving
-rea-native-probe directories under C:\Windows\Temp or C:\REA-LAB\tmp
-on the service runner. The upstream #1701 deletion symptom is distinct.
-Do not change production access controls based on this source analysis.
+AceCount==2 check, before that branch.
+
+On 2026-10-26 a separate **native Win32** test supplied an explicit,
+protected security descriptor with two full-access inheritable ACEs.
+It called CreateDirectoryW, then GetFileSecurityW to read back the
+native security descriptor (not a .NET-canonicalized ACL):
+
+- With two identical SYSTEM (S-1-5-18) ACEs as input, the Windows file
+  system returned **one** SYSTEM ACE.
+- In the control with SYSTEM and BUILTIN\Administrators as distinct
+  input ACEs, the native API returned **two** distinct ACEs.
+
+The repeatable test is scripts/fork-lab-acl-native-proof.ps1, runnable
+only under LocalSystem and limited to unique empty fixture directories
+inside C:\REA-LAB\artifacts. It validates protected DACL, expected
+trustees, owner and ACE count. This reproduces the identity/ACE-count
+mechanism independently of REA, but a rebuilt addon, a passing native
+boundary verifier and an end-to-end REA doctor run are still required
+to prove any source patch fixes the product. An earlier read-only sweep
+found no surviving rea-native-probe directories under C:\Windows\Temp
+or C:\REA-LAB\tmp on the service runner. The upstream #1701 deletion
+symptom is distinct. Do not change production access controls based
+on the independent proof.
 ### Additional static-format probes (executed 2026-10-25)
 
 A copy of the stock .NET 8 System.Runtime.dll (43,344 bytes) was placed only
