@@ -56,6 +56,11 @@ $gitVersion = Get-ExternalVersion -Command 'git.exe' -Argument '--version'
 $nodeSupported = Test-NodeEngine -NodeVersion $nodeVersion
 
 $problems = New-Object 'System.Collections.Generic.List[string]'
+$advisories = New-Object 'System.Collections.Generic.List[string]'
+$isLocalSystem = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value -eq 'S-1-5-18'
+if ($isLocalSystem) {
+    $advisories.Add('This process runs as LocalSystem. REA Windows native safety self-tests can fail under this service identity; verify with rea doctor and a bounded static analysis in an authorized interactive session.')
+}
 if (-not $nodeSupported) {
     $problems.Add("Node.js is missing or outside REA's declared supported engine ranges.")
 }
@@ -99,6 +104,9 @@ $report = [ordered]@{
     node_version = $nodeVersion
     pinned_node_version = $pinnedNode
     node_supported = $nodeSupported
+    runtime_identity = [ordered]@{ local_system = $isLocalSystem }
+    analysis_readiness = 'not-verified; run REA doctor and an offline fixture'
+    advisories = @($advisories.ToArray())
     npm_version = $npmVersion
     git_version = $gitVersion
     prerequisites_ready = ($problems.Count -eq 0)

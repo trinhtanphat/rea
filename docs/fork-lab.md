@@ -36,6 +36,23 @@ assert that native providers are installed or verified. It executes no target
 code, writes no files and downloads nothing. A nonzero exit status means
 the preflight requires attention.
 
+## Observed Windows service-account limitation (2026-10-25)
+
+On WIN11-181, Private Commander executes commands as
+`NT AUTHORITY\SYSTEM`. REA 6.8.0 `doctor` passed the Node.js and
+host checks, but its Windows native self-test reported
+`Private DACL contains unexpected trustees ... (Win32 5): Access is denied`.
+The same failure occurred with `TEMP`/`TMP` moved to `C:\REA-LAB\tmp`.
+A local four-file JavaScript/Electron fixture was inventoried but analysis
+returned `capability_unavailable` at the native runtime-control boundary.
+**This is not a passing end-to-end REA analysis test.**
+
+The preflight tool checks only basic prerequisites and now warns about
+LocalSystem; a green prerequisite result is not a working analysis provider.
+For actual analysis, use an authorized interactive user session or a
+separate supported test VM, then re-run `rea doctor` and an offline fixture.
+Do **not** weaken system temp-directory ACLs, bypass REA's safety self-test,
+or change the production Private Commander service identity to force a pass.
 ## Testing a repository or a program
 
 A GitHub source repository is not itself a native binary. First establish the
