@@ -53,6 +53,32 @@ For actual analysis, use an authorized interactive user session or a
 separate supported test VM, then re-run `rea doctor` and an offline fixture.
 Do **not** weaken system temp-directory ACLs, bypass REA's safety self-test,
 or change the production Private Commander service identity to force a pass.
+## Offline static smoke check (verified on WIN11-181)
+
+The synthetic fixture verifier checks one fully supported offline parser
+without touching an installed application or relying on a native provider.
+
+From the local checkout:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-static-smoke.ps1 -LabRoot C:\REA-LAB
+
+The verifier constructs a 71-byte safetensors test file in a unique directory
+under C:\REA-LAB\artifacts, invokes only inspect-model-artifact, checks the
+Evidence JSON and returns fixture and Evidence SHA-256 hashes. Successful
+checks require format=safetensors and exactly one declared F32 tensor named
+weight with one parameter. The result deliberately says both native provider
+and JavaScript application analysis remain unverified.
+
+Executed on 2026-10-25: PowerShell parsed without errors, REA CLI exited 0,
+and normalized Evidence matched the synthetic tensor declarations. This
+validates the model-header reader, not native binary decompilation.
+
+The native error "Private DACL contains unexpected trustees" observed under
+LocalSystem is distinct from upstream issue #1701, which primarily concerns
+deleting native self-test directories. One possible explanation is that the
+runner's current-user SID and the SYSTEM SID coincide. This remains a
+hypothesis without a rebuilt addon and an independent Windows DACL readback.
+Do not change production access controls based only on this observation.
 ## Testing a repository or a program
 
 A GitHub source repository is not itself a native binary. First establish the
