@@ -133,6 +133,7 @@ struct Security {
   std::vector<unsigned char> acl;
   SECURITY_DESCRIPTOR descriptor{};
   PSID userSid() const { return reinterpret_cast<const TOKEN_USER*>(user.data())->User.Sid; }
+  bool userIsSystem() { return EqualSid(userSid(), system.data()) != FALSE; }
   Security() {
     Handle token;
     HANDLE raw;
@@ -147,9 +148,13 @@ struct Security {
     acl.resize(sizeof(ACL) + 2 * (sizeof(ACCESS_ALLOWED_ACE) - sizeof(DWORD)) + GetLengthSid(userSid()) + systemSize);
     auto access = reinterpret_cast<PACL>(acl.data());
     require(InitializeAcl(access, acl.size(), ACL_REVISION), "Initialize private DACL failed");
-    for (PSID sid : {userSid(), static_cast<PSID>(system.data())})
+    // LocalSystem and SYSTEM are the same SID. Two identical ACEs can be
+    // canonicalized to one on disk; emit exactly one for that principal.
+    require(AddAccessAllowedAceEx(access, ACL_REVISION, OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE,
+                                 FILE_ALL_ACCESS, userSid()), "Populate private DACL failed");
+    if (!userIsSystem())
       require(AddAccessAllowedAceEx(access, ACL_REVISION, OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE,
-                                   FILE_ALL_ACCESS, sid), "Populate private DACL failed");
+                                   FILE_ALL_ACCESS, system.data()), "Populate private DACL failed");
     require(InitializeSecurityDescriptor(&descriptor, SECURITY_DESCRIPTOR_REVISION) &&
             SetSecurityDescriptorOwner(&descriptor, userSid(), FALSE) &&
             SetSecurityDescriptorDacl(&descriptor, TRUE, access, FALSE) &&
@@ -247,8 +252,11 @@ static void verifyPrivate(HANDLE handle, const std::wstring& path, bool root) {
   require(GetSecurityDescriptorControl(raw, &control, &revision), "Read DACL control flags failed", path);
   require(acl != nullptr && (control & SE_DACL_PRESENT) != 0 && (!root || (control & SE_DACL_PROTECTED) != 0),
           "Private object requires a present protected DACL", path, ERROR_ACCESS_DENIED);
-  require(acl->AceCount == 2, "Private DACL contains unexpected trustees", path, ERROR_ACCESS_DENIED);
-  bool user = false, system = false;
+  // Strictly one ACE when the current user is SYSTEM; otherwise require the
+  // current user and SYSTEM as two distinct trustees. No extra ACE is allowed.
+  require(acl->AceCount == (expected.userIsSystem() ? 1 : 2),
+          "Private DACL contains unexpected trustees", path, ERROR_ACCESS_DENIED);
+  bool user = false, system = expected.userIsSystem();
   for (DWORD index = 0; index < acl->AceCount; ++index) {
     void* rawAce;
     require(GetAce(acl, index, &rawAce), "Read private DACL entry failed", path);
