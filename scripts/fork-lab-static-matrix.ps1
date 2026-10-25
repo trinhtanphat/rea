@@ -86,41 +86,29 @@ function Invoke-StaticProbe {
     )
     $stdout = Join-Path $workspace "$Id.json"
     $stderr = Join-Path $workspace "$Id.stderr.txt"
-    # Only the REA CLI executes; the selected input is never launched.
-    # Direct .NET Process avoids PowerShell 5.1 Start-Process's unreliable
-    # ExitCode on this service runner, and enforces a per-process deadline.
-    $start = [Diagnostics.ProcessStartInfo]::new()
-    $start.FileName = $node
-    $start.Arguments = ('"{0}" {1} "{2}" --format json' -f $cli, $Command, $Target)
-    $start.WorkingDirectory = $workspace
-    $start.UseShellExecute = $false
-    $start.CreateNoWindow = $true
-    $start.RedirectStandardOutput = $true
-    $start.RedirectStandardError = $true
-    $process = [Diagnostics.Process]::new()
+    # The bounded helper permits only known static parsers; no target executes.
+    # Streaming output is capped *while* the child is running, avoiding
+    # unbounded ReadToEndAsync buffers on malformed/untrusted artifacts.
+    $runner = Join-Path $PSScriptRoot 'fork-lab-bounded-runner.mjs'
+    if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) {
+        throw "Missing bounded REA runner: $runner"
+    }
+    # PowerShell 5.1 turns a native stderr line into a terminating error
+    # under Stop; preserve the helper's 124/125 exit status first.
+    $priorPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     try {
-        $process.StartInfo = $start
-        [void]$process.Start()
-        # Drain both channels concurrently so a full pipe never stalls exit.
-        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
-        $stderrTask = $process.StandardError.ReadToEndAsync()
-        if (-not $process.WaitForExit($ProbeTimeoutSeconds * 1000)) {
-            $process.Kill()
-            [void]$process.WaitForExit(5000)
-            throw "REA CLI exceeded the per-process $ProbeTimeoutSeconds-second limit ($Id)."
-        }
-        $process.WaitForExit()
-        $code = $process.ExitCode
-        [IO.File]::WriteAllText($stdout, $stdoutTask.GetAwaiter().GetResult(),
-            [Text.UTF8Encoding]::new($false))
-        [IO.File]::WriteAllText($stderr, $stderrTask.GetAwaiter().GetResult(),
-            [Text.UTF8Encoding]::new($false))
+        & $node $runner $cli $Command $Target $stdout $stderr ([string]$ProbeTimeoutSeconds)
+        $code = $LASTEXITCODE
     }
     finally {
-        $process.Dispose()
+        $ErrorActionPreference = $priorPreference
     }
-    if ((Get-Item -LiteralPath $stdout).Length -gt 4MB) {
-        throw "REA output exceeds the 4 MiB test Evidence budget ($Id)."
+    if ($code -eq 124) {
+        throw "REA CLI exceeded the per-process $ProbeTimeoutSeconds-second limit ($Id)."
+    }
+    if ($code -eq 125) {
+        throw "REA bounded runner rejected or could not complete $Id."
     }
     $raw = Get-Content -LiteralPath $stdout -Raw -Encoding UTF8
     $parsed = $raw | ConvertFrom-Json

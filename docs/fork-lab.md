@@ -117,10 +117,23 @@ returned Evidence with exit 0; all malformed cases failed with exit 1.
 The hardened runner uses a 45-second per-process deadline by default
 (`-ProbeTimeoutSeconds` accepts 1–60), rejects Evidence over 4 MiB,
 and checks exact format errors plus the SHA-256 and paths of its inputs.
-A deliberate 1-second timeout check failed closed with a nonzero exit;
+The dedicated `scripts/fork-lab-bounded-runner.mjs` allows only three
+static REA parser commands, does not use a shell, writes newly created
+Evidence paths only, and bounds output **while streaming** (stdout 4 MiB,
+stderr 256 KiB). It returns code 124 on timeout or 125 on output overflow.
+
+The local helper regression suite is repeatable with:
+
+    C:\REA-LAB\toolchains\node-v24.22.1-win-x64\node.exe scripts\fork-lab-bounded-runner-test.mjs C:\REA-LAB\artifacts
+
+Executed on WIN11-181 (2026-10-26): the helper regression suite
+passed 3/3 cases (stdout overflow, stderr overflow, 1-second timeout),
+and the full static parser matrix passed again 6/6. A prior direct
+1-second timeout check also failed closed with a nonzero exit, and
 no related parser process remained in the subsequent process listing.
-This deadline bounds the direct REA CLI process, not an arbitrary child
+The deadline bounds the direct REA CLI process, not an arbitrary child
 process family. The fixed parser-only test inputs did not launch targets.
+Only the synthetic helper regression stubs are executed as mock CLI scripts.
 This is repeatable source-independent offline smoke coverage. It does not
 validate Ghidra, Hopper, IDA, JavaScript application analysis, native
 runtime authority, or the suitability of unknown user-provided artifacts.
