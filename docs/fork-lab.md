@@ -1,34 +1,34 @@
 # Fork-only Windows REA test lab
 
 This is an operator runbook for testing **authorized** repositories and built artifacts
-with the \`trinhtanphat/rea\` fork. It does not change upstream REA's provider,
+with the `trinhtanphat/rea` fork. It does not change upstream REA's provider,
 security or agent-setup contracts.
 
 ## WIN11-181 isolation
 
-- Working checkout: \`C:\REA-LAB\rea\`. The GitHub fork retains all upstream
+- Working checkout: `C:\REA-LAB\rea`. The GitHub fork retains all upstream
   branches, tags and their reachable commit histories; this local checkout is
   deliberately single-branch and shallow for reduced network/disk use.
-- \`origin\`: \`https://github.com/trinhtanphat/rea.git\`.
-- \`upstream\`: \`https://github.com/morluto/rea.git\`.
-- Portable pinned Node.js: \`C:\REA-LAB\toolchains\node-v24.22.1-win-x64\`.
+- `origin`: `https://github.com/trinhtanphat/rea.git`.
+- `upstream`: `https://github.com/morluto/rea.git`.
+- Portable pinned Node.js: `C:\REA-LAB\toolchains\node-v24.22.1-win-x64`.
   Its archive was checked against the official Node.js SHA-256 manifest.
   No machine-wide Node.js upgrade is needed.
 
 Select the portable runtime **for this PowerShell session only**:
 
-\`\`\`powershell
+```powershell
 $env:Path = "C:\REA-LAB\toolchains\node-v24.22.1-win-x64;$env:Path"
 Set-Location C:\REA-LAB\rea
 node --version
-\`\`\`
+```
 
 From the branch containing the preflight script, perform the read-only check:
 
-\`\`\`powershell
+```powershell
 powershell.exe -NoProfile -File .\scripts\fork-lab-preflight.ps1
 powershell.exe -NoProfile -File .\scripts\fork-lab-preflight.ps1 -TargetPath 'C:\path\to\authorized\artifact'
-\`\`\`
+```
 
 The check reports whether Node.js satisfies REA's declared engine ranges
 and whether npm, Git and the selected local path exist. It does **not**
@@ -56,15 +56,15 @@ Avoid executing untrusted binaries on WIN11-181.
 
 ## Building and checking the REA fork
 
-Check the current upstream \`AGENTS.md\`, \`docs/testing.md\` and
-\`docs/installation.md\` before changing code. On a dedicated development
+Check the current upstream `AGENTS.md`, `docs/testing.md` and
+`docs/installation.md` before changing code. On a dedicated development
 VM or isolated CI runner, use the pinned Node.js version:
 
-\`\`\`powershell
+```powershell
 npm ci
 npm run check:fast
 npm run test:focused -- path/to/relevant/test.test.ts
-\`\`\`
+```
 
 Full REA suites may be resource intensive and many cases assume Linux/macOS.
 The Windows source tree is not a substitute for verifying a real Ghidra, IDA,
@@ -79,6 +79,6 @@ evidence may be local while agent prompts/pseudocode still leave the host.
 ## Keeping the fork maintainable
 
 Make changes on feature branches, test them, and review a pull request before
-merging into \`main\`. Keep \`upstream\` as a separate read-only source for
+merging into `main`. Keep `upstream` as a separate read-only source for
 normal operations; never force-push over upstream branches or tags. Upstream
 sync should be deliberate and checked for conflicts rather than automatic.
