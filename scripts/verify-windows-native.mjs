@@ -119,6 +119,7 @@ const privateRuntimeAclObserver = String.raw`
     '{"protected":' + (Format-JsonBoolean $a.AreAccessRulesProtected) +
     ',"ownerMatchesUser":' + (Format-JsonBoolean ($owner.Value -eq $u.Value)) +
     ',"trusteesOnlyUserAndSystem":' + (Format-JsonBoolean $trusteesOnlyUserAndSystem) +
+    ',"userIsSystem":' + (Format-JsonBoolean ($u.Value -eq 'S-1-5-18')) +
     ',"count":' + $rules.Count +
     ',"rootReadonly":' + (Format-JsonBoolean (([int][IO.File]::GetAttributes($p) -band 1) -ne 0)) + '}')
   Trace-AclPhase 'complete'
@@ -444,7 +445,8 @@ process.stdout.write(JSON.stringify({executable:basename(process.execPath),abiVe
       protected: true,
       ownerMatchesUser: true,
       trusteesOnlyUserAndSystem: true,
-      count: 2,
+      userIsSystem: acl.userIsSystem,
+      count: acl.userIsSystem ? 1 : 2,
       rootReadonly: true,
     });
     native.call("runtime_mkdir", [runtime.handle, "inputs"]);
