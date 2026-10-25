@@ -79,6 +79,24 @@ deleting native self-test directories. One possible explanation is that the
 runner's current-user SID and the SYSTEM SID coincide. This remains a
 hypothesis without a rebuilt addon and an independent Windows DACL readback.
 Do not change production access controls based only on this observation.
+### Additional static-format probes (executed 2026-10-25)
+
+A copy of the stock .NET 8 System.Runtime.dll (43,344 bytes) was placed only
+in C:\REA-LAB\fixtures and processed with the isolated REA 6.8.0 CLI.
+
+- inspect-managed-artifact: exit 0; provider rea-dotnet-static; returned PE/CLI
+  identity, assembly metadata and references.
+- inspect-pe-imports: exit 0; provider rea-pe-imports; returned PE import and
+  delay-import inventory structure.
+- The identical copied test file had SHA-256
+  E044D7CAA0B903794245B593AE7EA793EE270374E2DAACB3035FA11031F7FB57.
+- An initial attempt to parse the large Node.js executable with the default
+  PE reader limit correctly failed because the file exceeds the 64 MiB budget.
+  Using a smaller legitimate fixture avoided relaxing this safety limit.
+
+These checks execute no inspected .NET assembly or PE binary. They prove
+only the observed static parser outcomes; provider-backed deep decompilation,
+target compatibility and JavaScript/Electron graph analysis remain unverified.
 ## Testing a repository or a program
 
 A GitHub source repository is not itself a native binary. First establish the
