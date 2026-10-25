@@ -75,10 +75,17 @@ validates the model-header reader, not native binary decompilation.
 
 The native error "Private DACL contains unexpected trustees" observed under
 LocalSystem is distinct from upstream issue #1701, which primarily concerns
-deleting native self-test directories. One possible explanation is that the
-runner's current-user SID and the SYSTEM SID coincide. This remains a
-hypothesis without a rebuilt addon and an independent Windows DACL readback.
-Do not change production access controls based only on this observation.
+deleting native self-test directories. The runner's current-user SID is S-1-5-18 (LocalSystem), identical
+to the SYSTEM SID. Source inspection shows an identity-aliasing problem
+in verifyPrivate: an ACE matching the user takes the first branch of an
+if/else-if, so the separate SYSTEM flag cannot be set when both SIDs
+coincide. However the **observed** error occurs at the preceding
+AceCount==2 check, before that branch. Whether Windows collapses duplicate
+SID ACEs or changes the returned DACL still needs a rebuilt addon and
+independent ACL readback to confirm. A read-only sweep found no surviving
+rea-native-probe directories under C:\Windows\Temp or C:\REA-LAB\tmp
+on the service runner. The upstream #1701 deletion symptom is distinct.
+Do not change production access controls based on this source analysis.
 ### Additional static-format probes (executed 2026-10-25)
 
 A copy of the stock .NET 8 System.Runtime.dll (43,344 bytes) was placed only
