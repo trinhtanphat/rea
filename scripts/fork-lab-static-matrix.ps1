@@ -77,19 +77,22 @@ function Invoke-StaticProbe {
         [Parameter(Mandatory=$true)][string]$Command,
         [Parameter(Mandatory=$true)][string]$Target,
         [Parameter(Mandatory=$true)][bool]$ExpectSuccess,
-        [Parameter(Mandatory=$true)][string]$ExpectedProvider
+        [string]$ExpectedProvider
     )
     $stdout = Join-Path $workspace "$Id.json"
     $stderr = Join-Path $workspace "$Id.stderr.txt"
     # The process is the isolated REA CLI only; the target is never executed.
-    $p = Start-Process -FilePath $node -ArgumentList @(
-        $cli, $Command, $Target, '--format', 'json'
-    ) -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-    if (-not $p.WaitForExit(45000)) {
-        try { $p.Kill() } catch { }
-        throw "REA static probe exceeded the 45-second deadline ($Id)."
+    # PowerShell 5.1 Start-Process does not provide reliable ExitCode on this
+    # service runner. Native invocation retains the actual $LASTEXITCODE.
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $node $cli $Command $Target '--format' 'json' 1> $stdout 2> $stderr
+        $code = $LASTEXITCODE
     }
-    $code = $p.ExitCode
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
     $raw = Get-Content -LiteralPath $stdout -Raw -Encoding UTF8
     $parsed = $raw | ConvertFrom-Json
     if ($ExpectSuccess) {

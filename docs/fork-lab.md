@@ -97,6 +97,31 @@ in C:\REA-LAB\fixtures and processed with the isolated REA 6.8.0 CLI.
 These checks execute no inspected .NET assembly or PE binary. They prove
 only the observed static parser outcomes; provider-backed deep decompilation,
 target compatibility and JavaScript/Electron graph analysis remain unverified.
+### Six-case static parser matrix
+
+After the isolated REA 6.8.0 CLI is present, run:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-static-matrix.ps1 -LabRoot C:\REA-LAB
+
+The script copies a locally installed stock System.Runtime.dll to an
+isolated, uniquely named directory below C:\REA-LAB\artifacts, and creates
+a synthetic 71-byte safetensors sample and two deliberately malformed
+fixtures. It executes six parser-only commands: valid and invalid inputs
+for safetensors, .NET/CLI identity, and Windows PE imports. It checks native
+command exit codes, returned Evidence and error JSON, provider identifiers,
+and expected model header facts. Reports contain SHA-256 hashes and input
+scope; generated binaries and Evidence are not added to Git.
+
+Real execution on WIN11-181 (2026-10-25): 6/6 passed. All valid cases
+returned Evidence with exit 0; all malformed cases failed with exit 1.
+This is repeatable source-independent offline smoke coverage. It does not
+validate Ghidra, Hopper, IDA, JavaScript application analysis, native
+runtime authority, or the suitability of unknown user-provided artifacts.
+
+For an alternative .NET reference fixture, provide
+-ManagedAssemblyPath with an absolute path to a permitted local assembly.
+Keep sample files below the 64 MiB PE reader default and do not expand
+runtime privileges to make a test pass.
 ## Testing a repository or a program
 
 A GitHub source repository is not itself a native binary. First establish the
