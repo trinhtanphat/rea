@@ -9,7 +9,8 @@
 [CmdletBinding()]
 param(
     [string]$LabRoot = 'C:\REA-LAB',
-    [string]$ManagedAssemblyPath
+    [string]$ManagedAssemblyPath,
+    [ValidateRange(1,60)][int]$ProbeTimeoutSeconds = 45
 )
 
 Set-StrictMode -Version Latest
@@ -51,6 +52,10 @@ if (-not (Test-Path -LiteralPath $assembly -PathType Leaf)) {
     throw 'The selected .NET fixture must be an existing file.'
 }
 
+# Check the input size before allocating and copying a large artifact.
+if ((Get-Item -LiteralPath $assembly).Length -gt 64MB) {
+    throw 'The selected fixture exceeds the default 64 MiB PE reader limit.'
+}
 $workspace = Join-Path $artifacts ('static-matrix-' + [guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($workspace)
 $copiedDll = Join-Path $workspace 'System.Runtime.dll'
@@ -81,17 +86,41 @@ function Invoke-StaticProbe {
     )
     $stdout = Join-Path $workspace "$Id.json"
     $stderr = Join-Path $workspace "$Id.stderr.txt"
-    # The process is the isolated REA CLI only; the target is never executed.
-    # PowerShell 5.1 Start-Process does not provide reliable ExitCode on this
-    # service runner. Native invocation retains the actual $LASTEXITCODE.
-    $previousPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
+    # Only the REA CLI executes; the selected input is never launched.
+    # Direct .NET Process avoids PowerShell 5.1 Start-Process's unreliable
+    # ExitCode on this service runner, and enforces a per-process deadline.
+    $start = [Diagnostics.ProcessStartInfo]::new()
+    $start.FileName = $node
+    $start.Arguments = ('"{0}" {1} "{2}" --format json' -f $cli, $Command, $Target)
+    $start.WorkingDirectory = $workspace
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $process = [Diagnostics.Process]::new()
     try {
-        & $node $cli $Command $Target '--format' 'json' 1> $stdout 2> $stderr
-        $code = $LASTEXITCODE
+        $process.StartInfo = $start
+        [void]$process.Start()
+        # Drain both channels concurrently so a full pipe never stalls exit.
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit($ProbeTimeoutSeconds * 1000)) {
+            $process.Kill()
+            [void]$process.WaitForExit(5000)
+            throw "REA CLI exceeded the per-process $ProbeTimeoutSeconds-second limit ($Id)."
+        }
+        $process.WaitForExit()
+        $code = $process.ExitCode
+        [IO.File]::WriteAllText($stdout, $stdoutTask.GetAwaiter().GetResult(),
+            [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText($stderr, $stderrTask.GetAwaiter().GetResult(),
+            [Text.UTF8Encoding]::new($false))
     }
     finally {
-        $ErrorActionPreference = $previousPreference
+        $process.Dispose()
+    }
+    if ((Get-Item -LiteralPath $stdout).Length -gt 4MB) {
+        throw "REA output exceeds the 4 MiB test Evidence budget ($Id)."
     }
     $raw = Get-Content -LiteralPath $stdout -Raw -Encoding UTF8
     $parsed = $raw | ConvertFrom-Json
@@ -102,9 +131,11 @@ function Invoke-StaticProbe {
         }
     }
     else {
-        if ($code -eq 0 -or [string]::IsNullOrEmpty([string]$parsed.code) -or
-            $parsed.category -notin @('invalid_input', 'unsupported_target')) {
-            throw "Malformed fixture was not safely rejected by $Id (exit $code)."
+        $expectedCode = if ($Id -eq 'pe-truncated') { 'invalid_request' } else { 'target_unavailable' }
+        $expectedCategory = if ($Id -eq 'pe-truncated') { 'invalid_input' } else { 'unsupported_target' }
+        if ($code -ne 1 -or $parsed.code -ne $expectedCode -or
+            $parsed.category -ne $expectedCategory) {
+            throw "Malformed fixture did not return the expected format rejection ($Id, exit $code)."
         }
     }
     return [pscustomobject]@{
@@ -136,9 +167,15 @@ if ($model.normalized_result.format -ne 'safetensors' -or $tensor.Count -ne 1 -o
 }
 $managed = Get-Content -LiteralPath (Join-Path $workspace 'managed-valid.json') -Raw | ConvertFrom-Json
 $pe = Get-Content -LiteralPath (Join-Path $workspace 'pe-valid.json') -Raw | ConvertFrom-Json
+$dllDigest = (Get-FileHash -LiteralPath $copiedDll -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($null -eq $managed.normalized_result.assembly -or
-    $null -eq $pe.normalized_result.imports) {
-    throw 'A static parser returned insufficient normalized facts.'
+    $null -eq $pe.normalized_result.imports -or
+    $managed.normalized_result.artifact.sha256 -ne $dllDigest -or
+    $pe.normalized_result.artifact.sha256 -ne $dllDigest -or
+    $managed.normalized_result.artifact.path -ne $copiedDll -or
+    $pe.normalized_result.artifact.path -ne $copiedDll -or
+    $model.normalized_result.artifact.path -ne $modelFixture) {
+    throw 'REA Evidence does not match the actual selected local fixtures.'
 }
 
 [ordered]@{

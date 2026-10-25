@@ -114,6 +114,13 @@ scope; generated binaries and Evidence are not added to Git.
 
 Real execution on WIN11-181 (2026-10-25): 6/6 passed. All valid cases
 returned Evidence with exit 0; all malformed cases failed with exit 1.
+The hardened runner uses a 45-second per-process deadline by default
+(`-ProbeTimeoutSeconds` accepts 1–60), rejects Evidence over 4 MiB,
+and checks exact format errors plus the SHA-256 and paths of its inputs.
+A deliberate 1-second timeout check failed closed with a nonzero exit;
+no related parser process remained in the subsequent process listing.
+This deadline bounds the direct REA CLI process, not an arbitrary child
+process family. The fixed parser-only test inputs did not launch targets.
 This is repeatable source-independent offline smoke coverage. It does not
 validate Ghidra, Hopper, IDA, JavaScript application analysis, native
 runtime authority, or the suitability of unknown user-provided artifacts.
