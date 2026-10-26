@@ -29,6 +29,22 @@ if (process.platform !== "win32")
   throw new Error(
     "Windows native conformance requires a real Windows x64 host.",
   );
+// Check the expected principal independently of the PowerShell ACL observer.
+// The previous assertion compared acl.userIsSystem with itself, which could
+// pass if both the observer's identity flag and ACE count were wrong.
+const whoamiUserCsv = execFileSync("whoami.exe", ["/user", "/fo", "csv", "/nh"], {
+  encoding: "utf8",
+  windowsHide: true,
+  timeout: 15_000,
+}).trim();
+const callerSid = whoamiUserCsv.match(/,\s*"(S-\d+(?:-\d+)+)"$/u)?.[1];
+assert.match(
+  callerSid,
+  /^S-\d+(?:-\d+)+$/u,
+  "Cannot independently establish the Windows caller SID",
+);
+const callerIsSystem = callerSid === "S-1-5-18";
+
 const packageRoot = resolve(process.argv[2] ?? ".");
 const { requireWindowsNativeAuthority } = await import(
   pathToFileURL(join(packageRoot, "dist/windows/WindowsNativeLoader.js"))
@@ -445,8 +461,8 @@ process.stdout.write(JSON.stringify({executable:basename(process.execPath),abiVe
       protected: true,
       ownerMatchesUser: true,
       trusteesOnlyUserAndSystem: true,
-      userIsSystem: acl.userIsSystem,
-      count: acl.userIsSystem ? 1 : 2,
+      userIsSystem: callerIsSystem,
+      count: callerIsSystem ? 1 : 2,
       rootReadonly: true,
     });
     native.call("runtime_mkdir", [runtime.handle, "inputs"]);
