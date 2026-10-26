@@ -208,26 +208,38 @@ of security policy without running an unknown target or deploying the addon.
 
 The repeatable test is `scripts/fork-lab-native-acl-negative.ps1`:
 
-    powershell.exe -NoProfile -File .\scripts\fork-lab-native-acl-negative.ps1 -LabRoot C:\REA-LAB -PatchedAddonPath C:\REA-LAB\artifacts\native-pr2-6b3443\rea-windows-x64.node -ExpectedAddonSha256 2ef814532639a53f6a490bc8631db96be8c59b2e1ce48ef863dbfdaadf1e65a6
+    powershell.exe -NoProfile -File .\scripts\fork-lab-native-acl-negative.ps1 -LabRoot C:\REA-LAB -PatchedAddonPath C:\REA-LAB\artifacts\native-pr2-hardened-3e375a39\rea-windows-x64.node -ExpectedAddonSha256 4eb3ecf392d78f379f7105820ff07cdfda62996ae02e7c1c1abfd463f9313019
 
-The script verifies the digest of the selected addon, creates unique
-test-owned directories under `C:\REA-LAB\artifacts`, and reads the
-actual Windows owner and ACL protection/count before making native calls.
-Expected results: one valid protected SYSTEM-only full-access directory
-is admitted; five invalid cases are rejected with Win32 5: extra
-Administrators trustee, missing inherit flags, a reduced access mask,
-an additional deny ACE, and an **unprotected DACL**. Note that Windows
-canonicalized an initially unprotected directory to protected at
-creation, so the final negative case explicitly enables inheritance
-on **its own newly created fixture only** and verifies readback.
-No pre-existing or production ACL is edited.
+The script verifies the digest of the selected addon, creates twelve
+unique test-owned directories under `C:\REA-LAB\artifacts`, and
+independently reads Windows owner, DACL protection and ACE count.
+Two valid cases are admitted: one protected full-control SYSTEM ACE,
+and two identical SYSTEM ACEs canonicalized by Windows into one.
+Ten negative cases are rejected with Win32 5: extra Administrators
+trustee, missing inheritance, reduced rights, extra deny ACE,
+unprotected DACL, wrong owner, inherit-only, unrelated trustee only,
+unexpected NO_PROPAGATE_INHERIT flag, and unexpected INHERITED flag
+on a protected root. Windows canonicalized a newly created
+unprotected fixture to protected at creation, so that fixture alone
+has inheritance re-enabled and read back before native verification.
+No pre-existing or production ACL is modified.
 
-Actual results: **6/6 passed** against the pinned patched addon,
-SHA-256 `2ef814532639a53f6a490bc8631db96be8c59b2e1ce48ef863dbfdaadf1e65a6`.
-The extra-deny-ACE fixture is refused during path opening; the remaining
-negative cases reach the native DACL checks. This validates these exact
-LocalSystem rejection boundaries, not a normal-user runtime or a real
-decompiler provider.
+The **original PR #2 patched addon** (SHA-256 starting `2ef81453`)
+accepted the NO_PROPAGATE_INHERIT and INHERITED root flag cases.
+PR #2 code commit `3e375a39` tightened `verifyPrivate` to demand
+the exact OBJECT_INHERIT | CONTAINER_INHERIT flags **for runtime roots
+only**, preserving the existing non-root child policy.
+This updated addon was built on isolated MinGW on PVE161-HOST and
+transferred with a hash-verified single-use lab channel.
+Actual results on WIN11-181: **12/12 pass**, addon SHA-256
+`4eb3ecf392d78f379f7105820ff07cdfda62996ae02e7c1c1abfd463f9313019`.
+The new build also passed Windows native conformance (23 filesystem
+controls + 8 process checks), REA's official native artifact validator,
+6/6 static parser cases, 6/6 artifact tamper-rejection tests, and
+the synthetic four-file Electron analysis (exit 0).
+The extra deny ACE and inherit-only ACE can fail during path admission;
+other invalid cases reach the native root DACL verifier. None of this
+establishes a non-SYSTEM user runtime or Ghidra/IDA/Hopper capability.
 
 ## Official native addon artifact integrity regression (2026-10-26)
 

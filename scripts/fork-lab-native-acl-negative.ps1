@@ -3,10 +3,10 @@
 .SYNOPSIS
   Exercise strict Windows native DACL admission with isolated ACL fixtures.
 .DESCRIPTION
-  Creates exactly six private test directories under the pre-existing REA
+  Creates exactly twelve private test directories under the pre-existing REA
   lab artifacts root. Checks the patched REA native addon directly: it must
-  admit one protected full-control SYSTEM ACE and refuse broader, weaker or
-  malformed ACLs. No pre-existing path is modified or removed; only one
+  admit an exact protected full-control SYSTEM ACE and refuse broader,
+  weaker or malformed ACLs, including unexpected root ACE flags. No pre-existing path is modified or removed; only one
   newly created fixture is changed to model an unprotected DACL.
 #>
 [CmdletBinding()]
@@ -49,7 +49,19 @@ $cases = @(
     @{name='wrong-access-mask'; sddl='O:SYG:SYD:P(A;OICI;0x00120089;;;SY)';
       shouldPass=$false; expectedAceCount=1; reason='unsupported rights or ACE type'},
     @{name='extra-deny-ace'; sddl='O:SYG:SYD:P(D;OICI;FA;;;BA)(A;OICI;FA;;;SY)';
-      shouldPass=$false; expectedAceCount=2; reason='Access is denied'}
+      shouldPass=$false; expectedAceCount=2; reason='Access is denied'},
+    @{name='wrong-owner'; sddl='O:BAG:SYD:P(A;OICI;FA;;;SY)';
+      shouldPass=$false; expectedAceCount=1; reason='owner is not the current user'},
+    @{name='inherit-only'; sddl='O:SYG:SYD:P(A;OICIIO;FA;;;SY)';
+      shouldPass=$false; expectedAceCount=1; reason='Access is denied'},
+    @{name='unrelated-only'; sddl='O:SYG:SYD:P(A;OICI;FA;;;BA)';
+      shouldPass=$false; expectedAceCount=1; reason='unrelated principal'},
+    @{name='no-propagate'; sddl='O:SYG:SYD:P(A;OICINP;FA;;;SY)';
+      shouldPass=$false; expectedAceCount=1; reason='unsupported rights or ACE type'},
+    @{name='inherited-marked'; sddl='O:SYG:SYD:P(A;OICIID;FA;;;SY)';
+      shouldPass=$false; expectedAceCount=1; reason='unsupported rights or ACE type'},
+    @{name='duplicate-system'; sddl='O:SYG:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;SY)';
+      shouldPass=$true; expectedAceCount=1; reason=''}
 )
 foreach ($fixture in $cases) {
     $target = Join-Path $workspace $fixture.name
@@ -70,8 +82,13 @@ foreach ($fixture in $cases) {
     $raw = [Security.AccessControl.RawSecurityDescriptor]::new(
         $readback.GetSecurityDescriptorBinaryForm(), 0)
     $wantProtected = $fixture.name -ne 'unprotected-dacl'
+    $expectedOwner = if ($fixture.name -eq 'wrong-owner') {
+        'S-1-5-32-544'
+    } else {
+        'S-1-5-18'
+    }
     if ($readback.AreAccessRulesProtected -ne $wantProtected -or
-        $raw.Owner.Value -ne 'S-1-5-18' -or
+        $raw.Owner.Value -ne $expectedOwner -or
         ($fixture.expectedAceCount -ge 0 -and
          $raw.DiscretionaryAcl.Count -ne $fixture.expectedAceCount)) {
         throw "The on-disk security descriptor changed during fixture creation: $($fixture.name)"
@@ -101,10 +118,10 @@ const results = checks.map(({name, shouldPass, reason}) => {
           message:message.slice(0, 350), passed};
 });
 console.log(JSON.stringify({
-  passed:results.length===6 && results.every(x=>x.passed),
+  passed:results.length===12 && results.every(x=>x.passed),
   tests:results
 }, null, 2));
-if (results.length !== 6 || !results.every(x=>x.passed)) process.exitCode=1;
+if (results.length !== 12 || !results.every(x=>x.passed)) process.exitCode=1;
 '@
 $helperPath = Join-Path $workspace 'check.cjs'
 [IO.File]::WriteAllText($helperPath, $helper, [Text.UTF8Encoding]::new($false))
