@@ -27,6 +27,14 @@ $artifacts = @(
     },
     [ordered]@{
         role = 'JDK'
+        version = 'Amazon Corretto 21.0.13.0.10'
+        filename = 'amazon-corretto-21.0.13.0.10-windows-x64-jdk.zip'
+        expectedBytes = [long]202668246
+        expectedSha256 = 'abd264a79e07c64e19aaa705e5b8ea8db01d5213877b8ac0b855a94541a4b0fd'
+        source = 'https://corretto.aws/downloads/resources/21.0.13.0.10/amazon-corretto-21.0.13.0.10-windows-x64-jdk.zip'
+    },
+    [ordered]@{
+        role = 'JDK'
         version = 'Temurin 21.0.12.1+1'
         filename = 'OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip'
         expectedBytes = [long]205073461
@@ -62,12 +70,15 @@ foreach($spec in $artifacts) {
         releaseUrl = $spec.source
     }
 }
-$allVerified = @($checks | Where-Object { -not $_.verified }).Count -eq 0
+$ghidraVerified = @($checks | Where-Object { $_.role -eq 'Ghidra' -and $_.verified }).Count -eq 1
+$jdkVerified = @($checks | Where-Object { $_.role -eq 'JDK' -and $_.verified }).Count -ge 1
+$allVerified = $ghidraVerified -and $jdkVerified
 [ordered]@{
     ready = $allVerified
+    ghidra_archive_verified = $ghidraVerified
+    compatible_jdk_archive_verified = $jdkVerified
     checks = $checks
     only_read_files = $true
-    ghidra_installed = $false
-    extraction_attempted = $false
+    extraction_attempted_by_this_script = $false
 } | ConvertTo-Json -Depth 6
 if (-not $allVerified) { exit 2 }

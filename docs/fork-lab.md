@@ -343,7 +343,80 @@ fixture directories were cleaned. This is compatibility evidence
 for these **two specific Node 24 builds**, not other majors or
 execution under a non-SYSTEM Windows user.
 
-## Ghidra 12.1.4 and JDK 21 lab archive readiness (2026-10-26)
+## Real Ghidra 12.1.4 provider integration on Windows (2026-10-26)
+
+The previous Ghidra blocker is **now resolved for one source-owned PE x64 DLL
+under LocalSystem**. This is real Java/Ghidra analysis and decompilation,
+not just static parsing or a provider health probe. No production service,
+Windows account, system PATH/JAVA_HOME, or interactive desktop was changed.
+
+| Fully validated archive | Bytes | Publisher SHA-256 |
+| --- | ---: | --- |
+| NSA Ghidra 12.1.4 PUBLIC ZIP | 569649598 | ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db |
+| Amazon Corretto JDK 21.0.13.0.10 Windows x64 ZIP | 202668246 | abd264a79e07c64e19aaa705e5b8ea8db01d5213877b8ac0b855a94541a4b0fd |
+
+Ghidra's first 495018176 bytes came from the previous GitHub download;
+its remaining 74631422 bytes were retrieved as 72 verified-length HTTP
+206 chunks from the SourceForge Ghidra project mirror on PVE161-HOST.
+After concatenation, the **whole ZIP** exactly matched the official
+NSA release asset SHA-256 above. Mirror content was never trusted
+without this publisher-pinned full-file hash.
+
+Amazon Corretto JDK 21 was downloaded from the official corretto.aws
+resources endpoint to isolated PVE161 staging, verified against the
+vendor's published latest_sha256 endpoint, transferred once over a
+short-lived IP-restricted local link, and reverified on WIN11-181.
+Both ZIPs passed traversal-path checks before extraction:
+
+- Ghidra root: C:\REA-LAB\toolchains\ghidra1214-isolated\ghidra_12.1.4_PUBLIC
+- Full JDK: C:\REA-LAB\toolchains\jdk21-corretto-isolated\jdk21.0.13_0
+
+Java and Javac both report 21.0.13. The revised
+scripts/fork-lab-ghidra-archives-preflight.ps1 accepts Ghidra 12.1.4
+plus **either** checksum-valid 64-bit full-JDK ZIP (Corretto 21.0.13
+or the earlier Temurin 21 fixture). Latest result: ready=true, exit 0.
+The obsolete Temurin download is still named *.partial and is not used.
+
+With scoped Java/Ghidra process environment, all individual Ghidra
+rea doctor checks are healthy: Windows x64, version 12.1.4, headless
+script, matching decompile.exe, full JDK 21 and Windows native
+authority. Wide-audit doctor still exits 1 because optional providers
+and client registrations such as Hopper/IDA/JADX are absent.
+
+The source-owned fixture is scripts/fixtures/rea-ghidra-arithmetic.cpp.
+Its 85850-byte PE32+ DLL was compiled using only the isolated MinGW
+toolchain on PVE161 and **was never executed**. Source DLL SHA-256:
+f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41.
+Local path: C:\REA-LAB\fixtures\ghidra-pe-arithmetic\rea_lab_arithmetic.dll.
+
+Reproduce the bounded, real Ghidra integration test using:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-ghidra-real-provider.ps1 -LabRoot C:\REA-LAB
+
+The script validates the official archive hashes plus the isolated
+addon/fixture digest before calling the real REA CLI:
+
+1. analyze --provider ghidra: exits 0 and returns a composed workflow
+   with an upstream Ghidra provider profile reporting version 12.1.4.
+2. search --kind procedures --mode regex: exits 0 and resolves both
+   exported functions rea_lab_add and rea_lab_mix.
+3. decompile <observed-address>: exits 0 and recovers the source-owned
+   operation 'return param_2 + param_1 + 7;'.
+4. File hashes, temporary native probes and Java/Node subprocesses are
+   checked after execution: the DLL/addon are unchanged and no owned
+   subprocess or probe remains.
+
+**All six asserted phases of the integrated runner passed on WIN11-181.**
+Captured JSON and stderr are stored under unique folders below
+C:\REA-LAB\artifacts. Every REA process is limited to four logical
+CPUs, BelowNormal priority, Java heap -Xmx1024m, bounded output and
+150 seconds maximum. The tests do not install Ghidra/Java globally.
+
+**Remaining coverage:** a genuine non-SYSTEM Windows user token,
+real IDA/Hopper providers, broader target architectures and real
+Ghidra MCP workflows are still unverified. Keep the patch PR draft.
+
+## Ghidra 12.1.4 and JDK 21 lab archive readiness — historical preflight (2026-10-26)
 
 REA 6.8.0 is verified against **Ghidra 12.1.x**, with real-provider
 tests primarily using 12.1.4 and JDK 21. Ghidra 12.2 is a newer
@@ -383,11 +456,12 @@ bytes and JDK **12480512 / 205073461** bytes (about 75 MB and
 193 MB short, respectively). Only the exact lab curl process was
 stopped; no download process remains. Neither partial archive has
 passed integrity checks, so neither may be extracted or executed.
-No Ghidra provider execution has been claimed. The
-preflight outputs an explicit JSON status, and the run's result was
-stored only under `C:\REA-LAB\artifacts`. Real Ghidra/JDK,
-normal-user token, IDA and Hopper tests are release blockers still
-open, not successes.
+At **this earlier checkpoint**, no Ghidra provider execution had
+been claimed. That preflight output is preserved in the lab's JSON
+artifact history. See the verified real-Ghidra provider section
+above for the subsequently completed ZIP/JDK acquisition and
+PE x64 decompiler run. Non-SYSTEM user token, IDA and Hopper
+integration tests are still release blockers.
 
 ## Testing a repository or a program
 
