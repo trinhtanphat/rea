@@ -398,6 +398,38 @@ This proves **four read-only Ghidra MCP tools on one synthetic
 PE x64 DLL under LocalSystem**, not all 229 advertised tools,
 a non-SYSTEM user, IDA/Hopper, or other target formats.
 
+## Additional MCP fail-closed regression (lab PR #1 `075ed85`)
+
+The isolated real Ghidra 12.1.4 MCP stdio test now includes a
+**negative-then-positive same-session** transition. An `open_binary`
+request for a unique **nonexistent file inside the lab** returned
+an MCP error as required. Without restarting the MCP server, the
+client then successfully opened the source-owned PE x64 DLL,
+ran `binary_overview`, found `rea_lab_add` and `rea_lab_mix`
+via `search_procedures`, and decompiled `rea_lab_add`
+with `procedure_pseudo_code` to recover the `+7` operation.
+
+All assertions passed on WIN11-181 under LocalSystem. Source:
+[PR #1 regression runner](https://github.com/trinhtanphat/rea/blob/chore/windows181-lab-preflight/scripts/fork-lab-ghidra-mcp-smoke.mjs),
+commit `075ed85293d5008b2c2fc2a43ecf508c26a236ca`.
+The JSON evidence is preserved in
+`C:\REA-LAB\artifacts\ghidra-mcp-real-v5o70r`.
+This checks **rejecting a missing input and continuing with a
+legitimate one**; it does not establish broader sandbox boundary
+isolation or the safety of all REA MCP tools.
+
+### Non-SYSTEM service-account attempt (not passed)
+
+An isolated, temporary Windows Task Scheduler entry was used
+to try a **LocalService** (`S-1-5-19`) identity probe without
+accessing the interactive Admin Session 2 or creating a user.
+The task returned `LastTaskResult=1` and **did not create the
+expected identity-report file**. The temporary scheduled task was
+then unregistered successfully. This establishes **no positive
+non-SYSTEM native-addon coverage**; the reason for the task's
+failure was not confirmed, and no further privilege/ACL workaround
+was attempted. Do not conflate this with a normal Windows user test.
+
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` due **other** optional engines and registrations (such as Hopper/IDA/JADX). Ghidra 12.1.4 with JDK 21 is **now present in the isolated lab** and all Ghidra-specific scoped doctor checks are healthy, with a real PE x64 CLI analysis/search/decompile passing. **Do not report the entire wide audit as healthy**.
