@@ -306,6 +306,43 @@ digests were checked afterward and remained unchanged. This verifies
 the artifact policy did not regress in these test cases; it is not
 a general malicious-binary sandbox or substitute for provider tests.
 
+## Cross-Node native and Electron Evidence matrix (2026-10-26)
+
+The pinned hardened Windows native addon (SHA-256
+`4eb3ecf392d78f379f7105820ff07cdfda62996ae02e7c1c1abfd463f9313019`)
+was tested independently using both Node 24 executables already present
+on WIN11-181, without modifying either Node installation, any running
+Private Commander process, or the Windows system PATH:
+
+- Private Commander Node `24.21.0` executable SHA-256:
+  `ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32`.
+- Portable REA-LAB Node `24.22.1` executable SHA-256:
+  `d702daa815eabbff763c7d3808e235cf031cf2ca70211b56847bc72f51e240e5`.
+
+The repeatable, single-command runner
+`scripts/fork-lab-node-version-matrix.mjs` checks the actual executable
+versions/digests and binary digest, then runs the **updated** Windows
+source conformance verifier and the same four-file synthetic Electron
+fixture under each Node version. It confines TEMP/TMP to
+`C:\REA-LAB\tmp`, requires existing fixture cleanliness, uses
+`shell:false` with a 90-second timeout and bounded output, and
+writes separate unique evidence files under `C:\REA-LAB\artifacts`:
+
+    C:\REA-LAB\toolchains\node-v24.22.1-win-x64\node.exe scripts\fork-lab-node-version-matrix.mjs C:\REA-LAB
+
+**Observed (Windows LocalSystem, 2026-10-26): both Node versions
+passed 23 filesystem/native controls + 8 process checks; both
+returned Electron provider `rea-javascript-application` with exit 0.**
+The actual Node stdout is UTF-8 and the two Electron Evidence streams
+were byte-identical: **231335 bytes per run**, SHA-256
+`1f7fb0067e70f0f3d59da984b4ed629d31c1f6ddd3d927d5ee5011eb07ee4049`.
+Earlier PowerShell 5.1 redirected files were saved in a different
+encoding (462674 bytes, SHA-256 starting `c764daf2`); this does not
+represent a content discrepancy in the source JSON. Native temporary
+fixture directories were cleaned. This is compatibility evidence
+for these **two specific Node 24 builds**, not other majors or
+execution under a non-SYSTEM Windows user.
+
 ## Ghidra 12.1.4 and JDK 21 lab archive readiness (2026-10-26)
 
 REA 6.8.0 is verified against **Ghidra 12.1.x**, with real-provider
@@ -339,9 +376,14 @@ whenever any input is missing, partial or invalid:
 
     powershell.exe -NoProfile -File .\scripts\fork-lab-ghidra-archives-preflight.ps1 -LabRoot C:\REA-LAB
 
-Observed on WIN11-181: **exit 2, ready=false**. Available partial
-bytes: Ghidra 183046144 / 569649598; JDK 12480512 / 205073461.
-No extraction or Ghidra provider execution has been claimed. The
+Observed on WIN11-181: **exit 2, ready=false**. After a bounded
+HTTP 206 resume and another CDN throughput degradation, the most
+recent incomplete archive sizes are Ghidra **495018176 / 569649598**
+bytes and JDK **12480512 / 205073461** bytes (about 75 MB and
+193 MB short, respectively). Only the exact lab curl process was
+stopped; no download process remains. Neither partial archive has
+passed integrity checks, so neither may be extracted or executed.
+No Ghidra provider execution has been claimed. The
 preflight outputs an explicit JSON status, and the run's result was
 stored only under `C:\REA-LAB\artifacts`. Real Ghidra/JDK,
 normal-user token, IDA and Hopper tests are release blockers still
