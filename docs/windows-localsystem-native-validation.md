@@ -91,6 +91,31 @@ The lab matrix on [draft PR #1](https://github.com/trinhtanphat/rea/pull/1) now 
 
 This is 12 successful assertions, confirming no observable regression in these three specific static parser commands. It does **not** prove all providers or a normal-user SID integration.
 
+## Direct native private DACL rejection regression
+
+A security-focused negative fixture suite was added to
+[lab PR #1](https://github.com/trinhtanphat/rea/pull/1) as
+`scripts/fork-lab-native-acl-negative.ps1` (commit `18f1fd6`).
+It invokes the source-built patched addon directly through the
+read-only `cutter_bridge_verify_directory` operation on six
+**new synthetic directory fixtures** under `C:\\REA-LAB\\artifacts`.
+
+2026-10-26, WIN11-181, LocalSystem token, addon SHA-256
+`2ef814532639a53f6a490bc8631db96be8c59b2e1ce48ef863dbfdaadf1e65a6`:
+**6/6 PASS**. The only admitted fixture had one protected, full-control,
+inheritable SYSTEM ACE. Five disallowed cases were rejected with Win32 5:
+an extra Administrators trustee, non-inheritable ACE, reduced-access
+mask, extra deny ACE, and unprotected DACL.
+
+The on-disk DACL owner and protection flags were independently checked
+before the native calls. Windows made the initially unprotected fixture
+protected during creation, so the test re-enabled inheritance on
+**that newly created fixture only** and verified its resulting readback.
+The extra-deny-ACE case was rejected during file open; the other
+negative cases reached native policy checks. This tests rejection policy
+as well as the original LocalSystem fix, but does not prove all host
+accounts and providers are covered.
+
 ## Packaged native artifact verification and tamper rejection
 
 Both lab packages were checked with the **shipping REA artifact verifier**
