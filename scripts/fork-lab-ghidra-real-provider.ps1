@@ -11,7 +11,7 @@
   production package replacement, or GitHub Actions.
 #>
 [CmdletBinding()]
-param([string]$LabRoot = 'C:\REA-LAB')
+param([string]$LabRoot = 'C:\REA-LAB', [switch]$Deterministic)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne 'S-1-5-18') {
@@ -24,7 +24,16 @@ $jdk = Join-Path $lab 'toolchains\jdk21-corretto-isolated\jdk21.0.13_0'
 $pkg = Join-Path $lab 'runtime\node_modules\rea-agents-pr2-hardened'
 $cli = Join-Path $pkg 'scripts\rea.mjs'
 $addon = Join-Path $pkg 'native\windows\build\rea-windows-x64.node'
-$fixture = Join-Path $lab 'fixtures\ghidra-pe-arithmetic\rea_lab_arithmetic.dll'
+$fixture = if($Deterministic) {
+    Join-Path $lab 'fixtures\ghidra-pe-reproducible\rea_lab_arithmetic.dll'
+} else {
+    Join-Path $lab 'fixtures\ghidra-pe-arithmetic\rea_lab_arithmetic.dll'
+}
+$expectedFixtureSha = if($Deterministic) {
+    '8be0a6f9f9ae5a18e2dcf65f0e0b21d0034b968c6606fb112b07133f372da299'
+} else {
+    'f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41'
+}
 $temp = Join-Path $lab 'tmp'
 $artifacts = Join-Path $lab 'artifacts'
 $preflight = Join-Path $lab 'rea\scripts\fork-lab-ghidra-archives-preflight.ps1'
@@ -36,7 +45,7 @@ foreach ($p in @($node,$cli,$addon,$fixture,$preflight,
 $shaAddon = (Get-FileHash -LiteralPath $addon -Algorithm SHA256).Hash.ToLowerInvariant()
 $shaFixture = (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($shaAddon -ne '4eb3ecf392d78f379f7105820ff07cdfda62996ae02e7c1c1abfd463f9313019' -or
-    $shaFixture -ne 'f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41') {
+    $shaFixture -ne $expectedFixtureSha) {
     throw 'Hardened addon or source-owned PE digest changed.'
 }
 $preflightRaw = & powershell.exe -NoProfile -File $preflight -LabRoot $lab
@@ -142,6 +151,7 @@ $summary=[ordered]@{
     providerVersion = '12.1.4'
     jdk = 'Amazon Corretto 21.0.13'
     fixtureSha256 = $shaFixture
+    fixtureKind = if($Deterministic) { 'reproducible-pe-x64' } else { 'original-pe-x64' }
     hardenedAddonSha256 = $shaAddon
     functionNames = @('rea_lab_add','rea_lab_mix')
     decompiledAddress = $address

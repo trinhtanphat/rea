@@ -548,12 +548,32 @@ per-process Java heap maximum of 1 GiB. It did **not** execute the
 target PE, replace the older DLL, change system Java, edit desktop
 Session 2 or modify any live service.
 
-The older full analyze/search/decompile Windows/MCP regressions
-**still use their separate original 85850-byte DLL and digest**.
-The deterministic 85853-byte DLL has now passed real Ghidra
-**analysis only**; do not mislabel it as passing the full
-search/decompile suite until those calls run against its exact
-SHA-256. Original Windows fixture location:
+**Full deterministic PE Windows Ghidra regression: 6/6 PASS.**
+The existing `scripts/fork-lab-ghidra-real-provider.ps1`
+now takes an explicit optional `-Deterministic` switch:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-ghidra-real-provider.ps1 -LabRoot C:\REA-LAB -Deterministic
+
+That switch selects **only** the separate new fixture directory
+and the fixed deterministic SHA-256; with the switch omitted,
+the original 85850-byte fixture and SHA pin are unchanged.
+
+A complete separate LocalSystem test against the actual new
+`8be0a6f9...` DLL verified all six phases:
+`pinned-archives`, `real-analyze`, `real-symbol-search`,
+`real-decompile`, `byte-integrity` and
+`owned-process-cleanup`. Ghidra **12.1.4** resolved both
+`rea_lab_add` and `rea_lab_mix`, then decompiled the first
+at **`0x180001370`** with
+`return param_2 + param_1 + 7;`, exactly matching the tracked
+C++ fixture. The recorded addon SHA was unchanged, and no
+owned Java/Node or native probe remained. Full JSON Evidence:
+`C:\REA-LAB\artifacts\ghidra-real-provider-d91ae23c0aed473aaf02ee9da2141d42`.
+The official original-fixture lane remains available as the
+default; it was **not overwritten or replaced**. The test does
+not establish a non-SYSTEM Windows user token, IDA/Hopper,
+additional PE architectures or universal compiler reproducibility.
+Original Windows fixture location:
 `C:\REA-LAB\fixtures\ghidra-pe-arithmetic\rea_lab_arithmetic.dll`.
 
 Reproduce the bounded, real Ghidra integration test using:
