@@ -517,6 +517,23 @@ The runner reports `missingProcedureRejected=true`,
 `closeBinaryPassed=true` and `postCloseSessionQueryPassed=true`.
 No leftover owned Java/Node processes or native probes were observed.
 
+**New reopen-after-close regression (2026-10-26):** The same
+bounded MCP runner now **reopens the same hash-pinned source-owned
+PE DLL in the same stdio server** after its first `close_binary`,
+executes a second real Ghidra `binary_overview`, and closes the
+binary again using the public MCP lifecycle API. The final
+`binary_session` structured result asserts `open=false` and
+`cleanup_pending=false`; no orphan Java/Node or native probe remains.
+The two independently produced, pretty-printed overview JSON files
+have **byte-identical SHA-256**
+`91215a33552ca3069cc2187363af4dfc1ab6c2a7fa3e7830e95894a287dd7a86`.
+A passing repeatable run is captured under
+`C:\REA-LAB\artifacts\ghidra-mcp-real-qMb6J5`, summary fields
+`reopenBinaryPassed=true`, `reopenedGhidraOverviewPassed=true`,
+and `finalCloseClean=true`. This verifies one complete **open /
+error recovery / close / reopen / analyze / close** cycle for the
+synthetic x64 PE, not all provider formats or arbitrary plugins.
+
 **Remaining coverage:** a genuine non-SYSTEM Windows user token,
 real IDA/Hopper integrations, and broader target formats/architectures
 are unverified. The verified MCP scope is **these four Ghidra tools**

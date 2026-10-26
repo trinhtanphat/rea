@@ -164,13 +164,47 @@ try {
     "The MCP binary session still has pending cleanup.");
   await writeFile(join(workspace,"post-close-session.json"),
     JSON.stringify(session.result,null,2)+"\n",{flag:"wx"});
+  // Closing a provider must not poison the shared MCP server: reopen
+  // the same owned DLL, query an actual Ghidra overview, and close again.
+  // This uses the normal public lifecycle API, not a forced reset.
+  const reopened=await request("tools/call",
+    {name:"open_binary",arguments:{path:target,provider_id:"ghidra"}},125000);
+  assert.ok(reopened.result && !reopened.result.isError,
+    "The MCP session could not reopen the owned PE after provider close");
+  await writeFile(join(workspace,"reopened-binary.json"),
+    JSON.stringify(reopened.result,null,2)+"\n",{flag:"wx"});
+  const overviewAfterReopen=await request("tools/call",
+    {name:"binary_overview",arguments:{}},125000);
+  assert.ok(overviewAfterReopen.result && !overviewAfterReopen.result.isError,
+    "Ghidra overview after reopening the binary failed");
+  const reopenedText=JSON.stringify(overviewAfterReopen.result);
+  assert.ok(/ghidra/i.test(reopenedText) &&
+    (reopenedText.includes("rea_lab_arithmetic.dll") || reopenedText.includes(expectedTarget)),
+    "Reopened overview lacks the expected Ghidra provider or fixture identity");
+  await writeFile(join(workspace,"reopened-overview.json"),
+    JSON.stringify(overviewAfterReopen.result,null,2)+"\n",{flag:"wx"});
+  const finalClose=await request("tools/call",
+    {name:"close_binary",arguments:{}},30000);
+  assert.ok(finalClose.result && !finalClose.result.isError,
+    "Second MCP close_binary failed");
+  const finalSession=await request("tools/call",
+    {name:"binary_session",arguments:{}},20000);
+  const finalState=finalSession.result?.structuredContent?.result;
+  assert.equal(finalState?.open,false,
+    "The MCP binary remains open after second close_binary");
+  assert.equal(finalState?.cleanup_pending,false,
+    "Ghidra resources remain pending after second close_binary");
+  await writeFile(join(workspace,"final-session.json"),
+    JSON.stringify(finalSession.result,null,2)+"\n",{flag:"wx"});
   const summary={passed:true, protocolVersion:init.result.protocolVersion, toolCount:tools.length,
     toolsPassed:["open_binary","binary_overview","search_procedures","procedure_pseudo_code"],
     targetSha256:expectedTarget, addonSha256:expectedNative,
     overviewBytes:Buffer.byteLength(content), overviewSha256:createHash("sha256").update(content).digest("hex"),
     missingTargetRejected:true, missingProcedureRejected:true,
     recoveredAfterMissingProcedure:true, closeBinaryPassed:true,
-    postCloseSessionQueryPassed:true, searchFoundBothFunctions:true, pseudocodeAdd7:true,
+    postCloseSessionQueryPassed:true, reopenBinaryPassed:true,
+    reopenedGhidraOverviewPassed:true, finalCloseClean:true,
+    searchFoundBothFunctions:true, pseudocodeAdd7:true,
     outputDir:workspace, session2Touched:false, productionMcpConfigured:false};
   await writeFile(join(workspace,"summary.json"),JSON.stringify(summary,null,2)+"\n",{flag:"wx"});
   successful=true;
