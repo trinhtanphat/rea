@@ -199,6 +199,36 @@ For an alternative .NET reference fixture, provide
 -ManagedAssemblyPath with an absolute path to a permitted local assembly.
 Keep sample files below the 64 MiB PE reader default and do not expand
 runtime privileges to make a test pass.
+## Independent current-user SID observer regression (2026-10-26)
+
+The original Windows conformance test checked the observed `userIsSystem`
+flag against **itself**. It now derives the expected token SID from a
+separate Windows `whoami.exe /user /fo csv /nh` process, and asserts the
+observed flag **and** expected 1-versus-2 ACE count against that
+independent SID. The first code change is on draft PR #2, commit
+`6216f8c`. The observed user identity was `S-1-5-18` under the
+LocalSystem service runner.
+
+The repeatable fault-injection test in
+`scripts/fork-lab-sid-observer-negative.mjs` uses the separately staged,
+exact PR #2 source verifier; it copies the four verifier helper modules
+into two **new** artifacts trees, runs one original verifier and then
+deliberately forges a **self-consistent but incorrect** `userIsSystem`
+and ACE count in a copy of the PowerShell observation. Both execute
+through Node.js with `shell: false`, bounded timeout/output and
+`C:\REA-LAB\tmp`, against the isolated hardened REA package:
+
+    C:\REA-LAB\toolchains\node-v24.22.1-win-x64\node.exe scripts\fork-lab-sid-observer-negative.mjs C:\REA-LAB C:\REA-LAB\validation-pr2\scripts\verify-windows-native.mjs C:\REA-LAB\runtime\node_modules\rea-agents-pr2-hardened
+
+Actual WIN11-181 results: the unmodified source verifier returned
+**exit 0, 23 native/filesystem controls and 8 process checks pass**;
+the deliberately forged observer returned **exit 1**, with the
+`userIsSystem` assertion mismatch. The regression runner reported
+`ok: true`, saved the two outputs under a new lab artifacts directory,
+and did not modify the installed packages, production ACLs, user
+tokens, services or interactive desktop session. This is negative-test
+coverage for the observer, not normal-user Windows token validation.
+
 ## Isolated native DACL rejection matrix (2026-10-26)
 
 On WIN11-181, the **source-built PR #2** Windows native addon was tested
