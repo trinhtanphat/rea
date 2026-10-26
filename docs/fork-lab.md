@@ -111,6 +111,19 @@ sweep found no surviving rea-native-probe directories under
 C:\Windows\Temp or C:\REA-LAB\tmp. Upstream issue #1701 describes a
 distinct delete-by-handle symptom. Do not change production ACLs or
 the desktop service identity based on this research.
+
+A reproducible **same-host native addon A/B regression** is available
+as `scripts/fork-lab-native-ab.ps1`. It requires explicitly provided
+expected SHA-256 digests for the original and patched addon, copies
+both modules into unique isolated fixture directories and runs the
+same `inspect` native control under LocalSystem. The 2026-10-26 test
+passed: published original exit 1 with exactly the historical private
+DACL Win32 5 error; source-patched PR #2 addon exit 0 and
+`privateDacl=true`. Both commands used pinned Node 24.22.1 and the
+same isolated NTFS TEMP directory. Neither installed package was
+overwritten. This is not evidence for non-SYSTEM integration or
+real Ghidra/IDA/Hopper provider operation.
+
 ### Additional static-format probes (executed 2026-10-25)
 
 A copy of the stock .NET 8 System.Runtime.dll (43,344 bytes) was placed only
