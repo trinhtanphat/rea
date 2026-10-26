@@ -9,6 +9,47 @@ The Private Commander host on WIN11-181 executes as `NT AUTHORITY\\SYSTEM` (SID 
 
 The independent readback proof in [draft PR #1](https://github.com/trinhtanphat/rea/pull/1) uses actual Win32 `CreateDirectoryW` and `GetFileSecurityW` APIs. Two identical SYSTEM full-control ACEs in the input returned **one** on NTFS; different SYSTEM + Administrators ACEs returned **two**. This PR's source change constructs one explicit ACE only if those principals are identical. Ordinary user accounts retain two ACEs and the native verifier still requires exact ACE count, owner, inheritance, mask, trustee and protected DACL.
 
+## Two pinned Node 24 runtime regressions (lab PR #1 commit `725237c`)
+
+The latest hardened Windows addon was tested on WIN11-181 under the
+same LocalSystem token using **two separately installed, checksum-pinned
+Node executables**. Neither executable or any production process was
+modified:
+
+| Node | Pinned executable SHA-256 | Windows native | Electron |
+| --- | --- | --- | --- |
+| Private Commander Node 24.21.0 | `ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32` | 23 filesystem + 8 process checks, pass | Exit 0 |
+| REA-LAB portable Node 24.22.1 | `d702daa815eabbff763c7d3808e235cf031cf2ca70211b56847bc72f51e240e5` | 23 filesystem + 8 process checks, pass | Exit 0 |
+
+The test is now a repeatable, bounded regression at
+[`scripts/fork-lab-node-version-matrix.mjs`](https://github.com/trinhtanphat/rea/blob/chore/windows181-lab-preflight/scripts/fork-lab-node-version-matrix.mjs).
+It verifies executable and addon digests, checks each Node version,
+runs exact source native conformance and the four-file source-owned
+Electron fixture, compares **raw UTF-8 JSON bytes**, and checks native
+fixture cleanup. **Evidence is byte-identical across both Nodes**:
+231,335 UTF-8 bytes, SHA-256
+`1f7fb0067e70f0f3d59da984b4ed629d31c1f6ddd3d927d5ee5011eb07ee4049`.
+The prior 462,674-byte PowerShell redirected Evidence was encoded
+differently; it does not represent a different JSON result.
+This verifies only these two Node 24 versions, not other Node majors
+or non-SYSTEM token behavior.
+
+## Lab engine acquisition status (not validated)
+
+The release-pinned Ghidra 12.1.4 PUBLIC ZIP and Temurin JDK 21 x64 ZIP
+have official upstream SHA-256 and size records in the lab preflight.
+The HTTPS CDN was too slow for a bounded test, even with HTTP 206
+continuation. Both identified lab-only downloads were stopped and
+saved as **untrusted `.zip.partial`**, not installed, unpacked or run.
+
+Latest partial bytes recorded on WIN11-181:
+- Ghidra: 495,018,176 of 569,649,598 bytes.
+- JDK: 12,480,512 of 205,073,461 bytes.
+
+The SHA/length preflight correctly returned **`ready=false`,
+exit code 2**. No agent may mark Ghidra provider integration as
+tested until both official archives are complete and verified.
+
 ## Independent Windows caller SID assertion (commit `6216f8c`)
 
 The first revision of the Windows conformance verifier compared
