@@ -492,12 +492,48 @@ Its 85850-byte PE32+ DLL was compiled using only the isolated MinGW
 toolchain on PVE161 and **was never executed**. The exact DLL tested on
 WIN11-181 has SHA-256:
 f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41.
-A rebuild of the C++ fixture in a separate isolated staging directory
-did **not** produce a byte-identical DLL, despite a disabled PE timestamp.
-This test therefore pins the **actual inspected DLL bytes**, not an
-unproved bit-for-bit reproducible PE build. Recompiled samples must be
-re-hashed and separately admitted before running a new assertion set.
-Local path: C:\REA-LAB\fixtures\ghidra-pe-arithmetic\rea_lab_arithmetic.dll.
+At the initial checkpoint a rebuild of this DLL in a different
+isolated output directory was **not** byte-identical, despite its PE
+timestamp being disabled. Root cause identified later: the MinGW PE
+linker auto-selected a **different ImageBase**, changing 663 binary
+bytes even when the C++ input was identical. This initial Ghidra CLI
+test continues to pin the **original inspected 85850-byte DLL**;
+it is not silently replaced by a newly built artifact.
+
+**NEW: reproducible Ghidra PE x64 fixture build (2026-10-26).**
+Use `scripts/fork-lab-ghidra-reproducible-pe.sh` on PVE161-HOST,
+with its already isolated MinGW-w64 compiler and sysroot:
+
+    bash scripts/fork-lab-ghidra-reproducible-pe.sh /var/tmp/rea-native-build-20261026/fixtures/rea-pe-ghidra-deterministic/rea-ghidra-arithmetic.cpp
+
+The script compiles the *same verified C++ source* into two separate
+fresh directories and compares the actual DLL bytes, not just
+metadata. It pins the linker flag `-Wl,--image-base,0x180000000`
+**and** `-Wl,--no-insert-timestamp`, then independently checks:
+PE32+ AMD64 type, 0 PE timestamp, the fixed ImageBase, exports
+`rea_lab_add` / `rea_lab_mix`, size bound, and a deliberate
+one-byte tamper on an isolated copy. It never loads or executes
+the Windows DLL or installs tools globally.
+
+The tracked C++ fixture input on WIN11-181 had SHA-256
+`ddf7f6af4e9044a2adbd49224fe235e073da96dadb8308ed53faef3f56767b5f`
+(429 bytes). That same exact byte stream was independently
+staged on PVE161. **Two separate script invocations, each building
+twice in distinct directories, produced four identical PE binaries**
+(85853 bytes), all with SHA-256
+`8be0a6f9f9ae5a18e2dcf65f0e0b21d0034b968c6606fb112b07133f372da299`.
+Manifest/evidence folders:
+`/var/tmp/rea-native-build-20261026/fixtures/pe-repro-cQy3lShm`
+and `/var/tmp/rea-native-build-20261026/fixtures/pe-repro-jrGlPByX`.
+
+This establishes **byte-for-byte reproducibility on the same isolated
+PVE161 toolchain and verified source**, not across arbitrary compilers,
+environments or OS versions. The older Windows Ghidra positive
+regression still targets the separate original DLL and pinned digest;
+the deterministic DLL must be separately admitted and analyzed
+before claiming real Windows Ghidra execution of these newer bytes.
+Original Windows fixture location:
+`C:\REA-LAB\fixtures\ghidra-pe-arithmetic\rea_lab_arithmetic.dll`.
 
 Reproduce the bounded, real Ghidra integration test using:
 
