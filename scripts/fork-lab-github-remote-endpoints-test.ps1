@@ -25,7 +25,9 @@ function Git-Checked([string]$Repository,[string[]]$GitParameters) {
     return $out
 }
 function Run-Endpoint-Case([string]$Name,[string]$Origin,[string[]]$PushUrls,
-                           [string[]]$UpstreamUrls,[bool]$Expected) {
+                           [string[]]$UpstreamUrls,[bool]$Expected,
+                           [string]$PushInsteadOf = '',
+                           [string]$FetchInsteadOf = '') {
     $repo = Join-Path $workspace $Name
     [void][IO.Directory]::CreateDirectory($repo)
     [void](Git-Checked -Repository $repo -GitParameters @('init','--quiet'))
@@ -33,6 +35,17 @@ function Run-Endpoint-Case([string]$Name,[string]$Origin,[string[]]$PushUrls,
     [void](Git-Checked -Repository $repo -GitParameters @('remote','add','upstream',$UpstreamUrls[0]))
     foreach ($url in @($UpstreamUrls | Select-Object -Skip 1)) {
         [void](Git-Checked -Repository $repo -GitParameters @('remote','set-url','--add','upstream',$url))
+    }
+    # Git may rewrite the effective destination through url.*.insteadOf
+    # and url.*.pushInsteadOf even when remote.origin.url is legitimate.
+    # Confirm get-url --all and --push --all expose both rewrites.
+    if ($PushInsteadOf.Length -gt 0) {
+        [void](Git-Checked -Repository $repo -GitParameters @(
+            'config','--local',('url.'+$PushInsteadOf+'.pushInsteadOf'),'https://github.com/'))
+    }
+    if ($FetchInsteadOf.Length -gt 0) {
+        [void](Git-Checked -Repository $repo -GitParameters @(
+            'config','--local',('url.'+$FetchInsteadOf+'.insteadOf'),'https://github.com/'))
     }
     for ($i=0; $i -lt $PushUrls.Length; $i++) {
         $gitCommand = if ($i -eq 0) {
@@ -69,6 +82,8 @@ $results += Run-Endpoint-Case -Name 'malicious-explicit-pushurl' -Origin $goodOr
 $results += Run-Endpoint-Case -Name 'second-malicious-pushurl' -Origin $goodOrigin -PushUrls @($goodOrigin,$badPush) -UpstreamUrls @($goodUpstream) -Expected $false
 $results += Run-Endpoint-Case -Name 'malicious-upstream' -Origin $goodOrigin -PushUrls @() -UpstreamUrls @('https://attacker.invalid/path/github.com/morluto/rea.git') -Expected $false
 $results += Run-Endpoint-Case -Name 'two-upstreams' -Origin $goodOrigin -PushUrls @() -UpstreamUrls @($goodUpstream,'https://github.com/morluto/rea') -Expected $false
+$results += Run-Endpoint-Case -Name 'malicious-pushInsteadOf-rewrite' -Origin $goodOrigin -PushUrls @() -UpstreamUrls @($goodUpstream) -Expected $false -PushInsteadOf 'https://attacker.invalid/'
+$results += Run-Endpoint-Case -Name 'malicious-insteadOf-fetch-rewrite' -Origin $goodOrigin -PushUrls @() -UpstreamUrls @($goodUpstream) -Expected $false -FetchInsteadOf 'https://attacker.invalid/'
 
 [ordered]@{
     ok = $true
