@@ -358,32 +358,46 @@ origin fetch endpoint, origin push endpoint (including pushInsteadOf
 rewrites), and upstream fetch endpoint** before a preview or push.
 Each list must contain **exactly one endpoint**, and all must match
 the explicitly allowed GitHub host and exact repository path.
-The offline regression uses six isolated Git repositories in
+The offline regression uses eight isolated Git repositories in
 `C:\REA-LAB\artifacts` with the actual git remote get-url commands:
 
     powershell.exe -NoProfile -File .\scripts\fork-lab-github-remote-endpoints-test.ps1
 
-**6/6 cases passed**: valid default origin/push and explicit SSH
-push were accepted; malicious pushurl, extra pushurl, malicious
-upstream and multiple upstream fetch URLs were rejected. Including
-the original 22 URL test cases, **28/28 remote-validation cases pass**.
+**8/8 cases passed** on WIN11-181: valid default origin/push and
+explicit SSH push were accepted; malicious pushurl, extra pushurl,
+malicious upstream, multiple upstream fetch URLs, malicious
+`pushInsteadOf` and malicious `insteadOf` rewrites were rejected.
+Including the original 22 URL test cases, **30/30 remote-validation
+cases pass**.
 No network requests, production Git remote changes or ref mutations
 are performed by these offline tests. Test evidence is saved only
 under newly created isolated lab directories.
 
-**Additional Git URL rewrite checks — awaiting WIN11-181 re-test:**
-The lab test suite now includes two further negative scenarios for
+**Git URL rewrite checks — now verified on WIN11-181:**
+Two additional negative cases exercise real Git
 `url.https://attacker.invalid/.pushInsteadOf` and
-`url.https://attacker.invalid/.insteadOf`. In a separate isolated
-Git fixture, the first rewrote an otherwise valid GitHub **push**
-destination to the attacker domain, while the second rewrote both
-the origin **fetch and push** destinations. These Git URL resolution
-semantics were independently reproduced; however, the added
-PowerShell integration cases have **not yet been run on WIN11-181**
-because its Private Commander tunnel-client was disconnected.
-Therefore the verified Windows result remains **28/28**, not 30/30,
-until the new cases pass on that host. The source and test changes
-are confined to the draft PR, with no CI or production activation.
+`url.https://attacker.invalid/.insteadOf` rewrites of an otherwise
+valid GitHub remote. The second changes both origin fetch and push
+endpoints; the first redirects the push endpoint only. The shared
+strict remote-allowlist function rejects both cases using
+`git remote get-url --all` and `--push --all` against eight
+isolated fixture repos. After recovering the Private Commander
+connection and fast-forwarding the local branch to the GitHub
+commit `3ba8f127`, the two Windows test scripts were re-run
+successfully on WIN11-181: **22/22 allowlist cases and 8/8 effective
+endpoint cases, combined 30/30 PASS**. Four related PowerShell
+scripts also passed the PowerShell 5.1 parser. The latest fixture
+output is under
+`C:\REA-LAB\artifacts\fork-git-endpoint-check-721d77cabf0c427e9400c24a90eb4ad1`.
+No CI, production Git remote or live-service configuration changed.
+
+The three local uncommitted files from the previous tunnel
+interruption were backed up with SHA-256 manifests at
+`C:\REA-LAB\artifacts\rea-github-reconcile-1bc93e8889b34eb0b624a54d8d75678f`,
+and a recovery Git stash was retained. Two local modified script
+blobs exactly matched GitHub; the local six-case endpoint test was
+superseded by the GitHub eight-case test. This completed the
+reconciliation without losing the original local bytes.
 
 It **never deletes refs or force-pushes**, never overwrites
 divergent tags/branches, and **explicitly preserves the intentionally
