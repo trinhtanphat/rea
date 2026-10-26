@@ -735,6 +735,29 @@ timeout is **not root-caused or fixed** by the successful retry; the
 Ghidra bridge's reopen path deserves further stability investigation.
 No timeout was raised or policy weakened to make the retry pass.
 
+**Per-RPC timeout/stability telemetry (2026-10-26, follow-up):**
+The MCP smoke test now writes a separate rpc-timings.json to each
+uniquely allocated lab workspace, including on failures. It records
+RPC IDs, safe operation names, explicit status (ok, tool_error,
+rpc_error, or timeout), elapsed wall-clock milliseconds and only the
+configured timeout budget on expiration. No MCP input arguments,
+binary paths, auth tokens or request payloads are copied into the
+telemetry. This preserves evidence when a second binary_overview stalls,
+without increasing deadlines or changing the provider runtime.
+
+The real deterministic PE x64 Ghidra test completed **PASS, exit 0**,
+with 14 RPC entries and clean final close/cleanup; evidence:
+C:\REA-LAB\artifacts\ghidra-mcp-real-uNnaeI\rpc-timings.json.
+On this run the first binary_overview took **64,705 ms**, while its
+post-close/reopen counterpart took **51,861 ms**. Search/decompile
+completed normally, the deliberate invalid-path and missing-procedure
+calls returned tool errors, and no REA/Ghidra-owned processes or native
+probe folders remained. The earlier failed original-fixture run
+still had a second overview reporting error after 127,273 ms; its
+root cause remains unknown. These timings characterize different
+runs and should not be interpreted as a fixed performance guarantee.
+The Session 2 desktop and production MCP were not used.
+
 **Remaining coverage:** a genuine non-SYSTEM Windows user token,
 real IDA/Hopper integrations, and broader target formats/architectures
 are unverified. The verified MCP scope is **these four Ghidra tools**

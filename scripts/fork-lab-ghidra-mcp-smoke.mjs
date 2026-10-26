@@ -52,6 +52,7 @@ let diagnostics = [];
 child.stderr.setEncoding("utf8");
 child.stderr.on("data", data => {stderr = (stderr + data).slice(-500000);});
 const pending = new Map();
+const rpcTimings = [];
 let nextId = 0;
 const reader = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
 reader.on("line", line => {
@@ -59,14 +60,29 @@ reader.on("line", line => {
     const m = JSON.parse(line);
     if (m.id === undefined) { diagnostics.push(m.method ?? "notification"); return; }
     const wait = pending.get(m.id);
-    if (wait) {pending.delete(m.id);clearTimeout(wait.timer); wait.resolve(m);}
+    if (wait) {
+      pending.delete(m.id);
+      clearTimeout(wait.timer);
+      rpcTimings.push({id:m.id,operation:wait.operation,
+        status:m.error ? "rpc_error" : m.result?.isError ? "tool_error" : "ok",
+        elapsedMs:Date.now()-wait.started});
+      wait.resolve(m);
+    }
   } catch(err) {diagnostics.push("INVALID_JSON:" + String(err).slice(0,200));}
 });
 function request(method, params, ms) {
   const id = ++nextId;
+  const started = Date.now();
+  // Only record the operation name; never record tokens, file paths or request arguments.
+  const operation = method === "tools/call" ? "tools/call:" + params.name : method;
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {pending.delete(id);reject(Error("MCP timeout " + method));},ms);
-    pending.set(id, {resolve, reject, timer});
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      rpcTimings.push({id,operation,status:"timeout",elapsedMs:Date.now()-started,
+        deadlineMs:ms});
+      reject(Error("MCP timeout " + operation));
+    },ms);
+    pending.set(id, {resolve, reject, timer, operation, started});
     child.stdin.write(JSON.stringify({jsonrpc:"2.0",id,method,params})+"\n");
   });
 }
@@ -212,7 +228,8 @@ try {
     postCloseSessionQueryPassed:true, reopenBinaryPassed:true,
     reopenedGhidraOverviewPassed:true, finalCloseClean:true,
     searchFoundBothFunctions:true, pseudocodeAdd7:true,
-    outputDir:workspace, session2Touched:false, productionMcpConfigured:false};
+    outputDir:workspace, rpcTimingsFile:"rpc-timings.json",
+    session2Touched:false, productionMcpConfigured:false};
   await writeFile(join(workspace,"summary.json"),JSON.stringify(summary,null,2)+"\n",{flag:"wx"});
   successful=true;
   console.log(JSON.stringify(summary));
@@ -223,6 +240,10 @@ try {
     const timer=setTimeout(()=>{try{const x=spawnSync("taskkill.exe",["/PID",String(child.pid),"/T","/F"],{windowsHide:true,timeout:7000});}catch{}resolve();},4000);
     child.once("exit",()=>{clearTimeout(timer);resolve();});
   });
+  // Always persist per-RPC timing evidence, even if a bridge call timed out.
+  await writeFile(join(workspace,"rpc-timings.json"),
+    JSON.stringify({fixtureKind:deterministic ? "reproducible-pe-x64" : "original-pe-x64",
+      completed:successful,requests:rpcTimings},null,2)+"\n",{flag:"wx"});
   await writeFile(join(workspace,"stderr.txt"),stderr,{flag:"wx"});
   if(!successful)console.error("MCP_FAILED_METADATA="+JSON.stringify({workspace,diagnostics,stderrTail:stderr.slice(-1200)}));
 }
