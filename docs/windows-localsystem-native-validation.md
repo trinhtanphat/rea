@@ -550,6 +550,51 @@ It does not prove a non-SYSTEM caller can run the native addon,
 does not resolve optional IDA/Hopper providers, and does not
 authorize merging PR #2 into `main` or changing live services.
 
+## Reproducible Ghidra PE x64 builder and real Windows analysis — 2026-10-26
+
+The lab PR #1 now contains
+`scripts/fork-lab-ghidra-reproducible-pe.sh`, a reproducible,
+**isolated** MinGW-w64 build check for the source-owned C++ test DLL.
+The earlier DLL rebuild divergence was traced to the linker's
+auto-selected **PE ImageBase**. Pinning
+`-Wl,--image-base,0x180000000` alongside
+`-Wl,--no-insert-timestamp` resolved this for the PVE161
+toolchain.
+
+The **exact tracked C++ source bytes**, SHA-256
+`ddf7f6af4e9044a2adbd49224fe235e073da96dadb8308ed53faef3f56767b5f`,
+were staged in PVE161's isolated lab. Two distinct invocations,
+each compiling into two new directories, produced **four
+byte-identical PE32+ AMD64 DLLs** of 85,853 bytes, all SHA-256
+`8be0a6f9f9ae5a18e2dcf65f0e0b21d0034b968c6606fb112b07133f372da299`.
+The verifier also checked the two export names, zero PE timestamp,
+fixed ImageBase and that changing one byte alters the output.
+PVE161 Evidence manifests:
+`/var/tmp/rea-native-build-20261026/fixtures/pe-repro-cQy3lShm`
+and
+`/var/tmp/rea-native-build-20261026/fixtures/pe-repro-jrGlPByX`.
+
+The same deterministic PE was transferred via a one-use restricted
+internal HTTP listener into a **separate** fixture directory on
+WIN11-181. Its destination SHA-256 was reverified and the
+unchanged isolated hardened REA addon was used to invoke **real**
+`rea analyze --provider ghidra --json`. This **passed, exit 0**:
+the Evidence reported upstream **Ghidra 12.1.4** and matched the
+deterministic PE SHA-256 above. Evidence file SHA-256:
+`8d0ff274867a917ff31888d0ec953952492e9b04461f36c81996a6ffa78bdd1e`;
+path
+`C:\REA-LAB\artifacts\ghidra-deterministic-pe-analysis-20261026`.
+
+The preexisting full Ghidra search/decompile and four-tool MCP
+regressions still use the **older separately pinned 85,850-byte
+DLL**, not the deterministic artifact. The newly reproducible PE
+is **verified for real Ghidra analysis only**; its Ghidra
+search/decompile have not been separately exercised. The proof
+is bound to **this toolchain, compiler environment and verified
+source**, not universal cross-platform reproducibility. Nothing
+was installed or changed globally; no desktop Session 2,
+production MCP, game or service was touched.
+
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` due **other** optional engines and registrations (such as Hopper/IDA/JADX). Ghidra 12.1.4 with JDK 21 is **now present in the isolated lab** and all Ghidra-specific scoped doctor checks are healthy, with a real PE x64 CLI analysis/search/decompile passing. **Do not report the entire wide audit as healthy**.
