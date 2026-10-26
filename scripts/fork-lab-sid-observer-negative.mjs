@@ -47,9 +47,9 @@ const forgedScript = join(forgedDir, "verify-windows-native.mjs");
 await writeFile(originalScript, code, { flag: "wx" });
 await writeFile(forgedScript, altered, { flag: "wx" });
 const env = { ...process.env, TEMP: join(lab, "tmp"), TMP: join(lab, "tmp") };
-const run = (script) => {
+const run = (script, runEnv = env) => {
   const result = spawnSync(process.execPath, [script, pkg], {
-    env, encoding: "utf8", shell: false, windowsHide: true,
+    env: runEnv, encoding: "utf8", shell: false, windowsHide: true,
     timeout: 90_000, maxBuffer: 4 * 1024 * 1024,
   });
   if (result.error) throw result.error;
@@ -65,6 +65,24 @@ const negative = run(forgedScript);
 assert.notEqual(negative.status, 0, "Forged ACL observer unexpectedly passed.");
 assert.match(negative.stderr, /userIsSystem/u, "Expected SID mismatch, not unrelated failure.");
 assert.match(negative.stderr, /AssertionError/u);
+// An attacker-controlled PATH entry must not become the identity oracle.
+// Copy a Microsoft Windows executable under a bogus whoami.exe name; the
+// source verifier must still use System32\\whoami.exe by absolute path.
+const shadow = join(workspace, "fake-path");
+await mkdir(shadow);
+const systemRoot = process.env.SystemRoot ?? process.env.windir;
+assert.ok(systemRoot, "SystemRoot is required");
+await copyFile(join(systemRoot, "System32", "cmd.exe"), join(shadow, "whoami.exe"));
+// Windows environment keys are case-insensitive, but Node may expose "Path"
+// rather than "PATH". Reuse the existing spelling and preserve the full PATH.
+const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path");
+assert.ok(pathKey, "Existing PATH is required for the verifier's helpers.");
+const shadowEnv = { ...env, [pathKey]: shadow + ";" + env[pathKey] };
+const pathShadow = run(originalScript, shadowEnv);
+assert.equal(pathShadow.status, 0, "PATH-shadowed identity oracle: " + pathShadow.stderr.slice(-1500));
+const shadowReport = JSON.parse(pathShadow.stdout);
+assert.equal(shadowReport.ok, true);
+await writeFile(join(workspace, "path-shadow-positive.json"), pathShadow.stdout, { flag: "wx" });
 await writeFile(join(workspace, "positive.json"), positive.stdout, { flag: "wx" });
 await writeFile(join(workspace, "negative.stderr.txt"), negative.stderr, { flag: "wx" });
 const summary = {
@@ -73,6 +91,7 @@ const summary = {
   positive: { exitCode: positive.status, controls: Object.keys(parsed.controls).length,
     processChecks: Object.keys(parsed.processes).length, passed: true },
   negative: { exitCode: negative.status, forgedSidAndAceCountRejected: true },
+  pathShadow: { exitCode: pathShadow.status, verified: true, cannotShadowSystemWhoami: true },
   workspace,
   productionFilesModified: false,
 };
