@@ -494,6 +494,32 @@ This is verified **for the selected PE x64 fixture and these MCP
 operations only**, not a release proof for all advertised tools or
 a Windows non-SYSTEM identity.
 
+## Ghidra MCP reopen-after-close lifecycle (PR #1 `3d71508`)
+
+An additional real LocalSystem Ghidra 12.1.4 stdio MCP regression
+now verifies a **full reopen after a clean provider close** in the
+**same REA server process**, using the same SHA-256-pinned source-owned
+PE x64 DLL and hardened native addon.
+
+The test follows this sequence: select binary, analyze, reject a
+missing procedure, successfully decompile `rea_lab_add`, call
+`close_binary`, verify `binary_session` reports
+`open=false` and `cleanup_pending=false`, **reopen the identical
+binary**, issue a second `binary_overview`, close again, and verify
+the same two closed-session fields. The two overview JSON files are
+**byte-identical** (SHA-256
+`91215a33552ca3069cc2187363af4dfc1ab6c2a7fa3e7830e95894a287dd7a86`).
+The final isolated output is
+`C:\REA-LAB\artifacts\ghidra-mcp-real-qMb6J5`; no owned
+Java/Node or native probe residue remained.
+
+The repeatable test was committed in
+[lab PR #1, commit `3d71508`](https://github.com/trinhtanphat/rea/pull/1),
+under `scripts/fork-lab-ghidra-mcp-smoke.mjs`.
+This is Windows LocalSystem / one x64 PE / Ghidra MCP only. A
+genuine non-SYSTEM user token and IDA/Hopper are **not validated**.
+There was no change to any live/private MCP connection.
+
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` due **other** optional engines and registrations (such as Hopper/IDA/JADX). Ghidra 12.1.4 with JDK 21 is **now present in the isolated lab** and all Ghidra-specific scoped doctor checks are healthy, with a real PE x64 CLI analysis/search/decompile passing. **Do not report the entire wide audit as healthy**.
