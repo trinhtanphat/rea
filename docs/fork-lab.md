@@ -501,6 +501,22 @@ The successful fixture is under
 exited and no native probes remain. No account, Session 2 desktop,
 system environment, installed provider or production MCP was altered.
 
+**Expanded missing-procedure and lifecycle regression:** The same MCP
+session now calls `procedure_pseudo_code` on a unique nonexistent
+procedure, requires the error response, then decompiles
+`rea_lab_add` successfully. It also calls `close_binary`
+explicitly, then queries `binary_session` and asserts the
+**actual structured session fields** `open=false` and
+`cleanup_pending=false`. This checks both error recovery and
+provider lifecycle cleanup rather than inferring closure from
+process exit. Two actual runs on WIN11-181 passed; the strict
+session-state check completed successfully with
+`C:\REA-LAB\artifacts\ghidra-mcp-real-ezWfr5`.
+The runner reports `missingProcedureRejected=true`,
+`recoveredAfterMissingProcedure=true`,
+`closeBinaryPassed=true` and `postCloseSessionQueryPassed=true`.
+No leftover owned Java/Node processes or native probes were observed.
+
 **Remaining coverage:** a genuine non-SYSTEM Windows user token,
 real IDA/Hopper integrations, and broader target formats/architectures
 are unverified. The verified MCP scope is **these four Ghidra tools**

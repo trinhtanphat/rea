@@ -127,6 +127,15 @@ try {
   await writeFile(join(workspace,"search-result.json"),JSON.stringify(search.result,null,2)+"\n",{flag:"wx"});
   const pseudoTool=tools.find(t=>t.name==="procedure_pseudo_code");
   assert.ok(pseudoTool?.inputSchema?.properties?.procedure,"Missing procedure_pseudo_code schema");
+  // Missing procedure must return a tool error without corrupting the
+  // selected document. The subsequent valid decompile is the recovery check.
+  const missingProcedure="rea_lab_this_function_does_not_exist";
+  const rejectedProcedure=await request("tools/call",
+    {name:"procedure_pseudo_code",arguments:{procedure:missingProcedure}},120000);
+  assert.ok(rejectedProcedure.error || rejectedProcedure.result?.isError===true,
+    "Missing procedure unexpectedly produced a successful pseudocode result.");
+  await writeFile(join(workspace,"rejected-missing-procedure.json"),
+    JSON.stringify(rejectedProcedure,null,2)+"\n",{flag:"wx"});
   const pseudo=await request("tools/call",
     {name:"procedure_pseudo_code",arguments:{procedure:"rea_lab_add"}},120000);
   assert.ok(pseudo.result && !pseudo.result.isError,
@@ -135,11 +144,33 @@ try {
   assert.ok(pseudoText.includes("rea_lab_add") && /return[^;]*\+[^;]*7/u.test(pseudoText),
     "MCP Ghidra pseudocode did not reconstruct the source-owned +7 function");
   await writeFile(join(workspace,"pseudocode-result.json"),JSON.stringify(pseudo.result,null,2)+"\n",{flag:"wx"});
+  // Use REA's own lifecycle operation to release the Ghidra provider,
+  // rather than relying exclusively on stdin EOF/process termination.
+  const closeTool=tools.find(t=>t.name==="close_binary");
+  assert.ok(closeTool,"REA MCP close_binary tool missing");
+  const closed=await request("tools/call",
+    {name:"close_binary",arguments:{}},30000);
+  assert.ok(closed.result && !closed.result.isError,
+    "MCP close_binary failed: "+JSON.stringify(closed.error??closed.result).slice(0,1300));
+  await writeFile(join(workspace,"closed-binary.json"),
+    JSON.stringify(closed.result,null,2)+"\n",{flag:"wx"});
+  const session=await request("tools/call",
+    {name:"binary_session",arguments:{}},20000);
+  assert.ok(session.result && !session.result.isError,
+    "MCP binary_session after close failed: "+JSON.stringify(session.error??session.result).slice(0,1300));
+  const closedState=session.result.structuredContent?.result;
+  assert.equal(closedState?.open,false,"The MCP binary remains open after close_binary.");
+  assert.equal(closedState?.cleanup_pending,false,
+    "The MCP binary session still has pending cleanup.");
+  await writeFile(join(workspace,"post-close-session.json"),
+    JSON.stringify(session.result,null,2)+"\n",{flag:"wx"});
   const summary={passed:true, protocolVersion:init.result.protocolVersion, toolCount:tools.length,
     toolsPassed:["open_binary","binary_overview","search_procedures","procedure_pseudo_code"],
     targetSha256:expectedTarget, addonSha256:expectedNative,
     overviewBytes:Buffer.byteLength(content), overviewSha256:createHash("sha256").update(content).digest("hex"),
-    missingTargetRejected:true, searchFoundBothFunctions:true, pseudocodeAdd7:true,
+    missingTargetRejected:true, missingProcedureRejected:true,
+    recoveredAfterMissingProcedure:true, closeBinaryPassed:true,
+    postCloseSessionQueryPassed:true, searchFoundBothFunctions:true, pseudocodeAdd7:true,
     outputDir:workspace, session2Touched:false, productionMcpConfigured:false};
   await writeFile(join(workspace,"summary.json"),JSON.stringify(summary,null,2)+"\n",{flag:"wx"});
   successful=true;
