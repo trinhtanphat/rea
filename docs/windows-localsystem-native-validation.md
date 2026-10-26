@@ -585,15 +585,27 @@ deterministic PE SHA-256 above. Evidence file SHA-256:
 path
 `C:\REA-LAB\artifacts\ghidra-deterministic-pe-analysis-20261026`.
 
-The preexisting full Ghidra search/decompile and four-tool MCP
-regressions still use the **older separately pinned 85,850-byte
-DLL**, not the deterministic artifact. The newly reproducible PE
-is **verified for real Ghidra analysis only**; its Ghidra
-search/decompile have not been separately exercised. The proof
-is bound to **this toolchain, compiler environment and verified
-source**, not universal cross-platform reproducibility. Nothing
-was installed or changed globally; no desktop Session 2,
-production MCP, game or service was touched.
+**Full Windows Ghidra 12.1.4 regression on deterministic DLL:
+6/6 PASS**, also completed later on 2026-10-26. The source-owned
+Windows runner in lab PR #1 now accepts `-Deterministic`, selecting
+only the separate 85,853-byte DLL path and its pinned SHA-256.
+It passed verified official archives, actual `analyze`,
+`search_procedures` for `rea_lab_add` and `rea_lab_mix`,
+`decompile` at **0x180001370** reproducing
+`return param_2 + param_1 + 7;`, and post-run file
+integrity plus owned-process cleanup. The complete six-phase
+summary and captured responses are at
+`C:\REA-LAB\artifacts\ghidra-real-provider-d91ae23c0aed473aaf02ee9da2141d42`,
+documented in [PR #1 commit `36d7c3fa`](https://github.com/trinhtanphat/rea/pull/1).
+
+The original fixture and its previous **full** Ghidra CLI/MCP
+regressions remain unchanged; the new DLL is not a replacement.
+Proof of byte reproducibility is bound to **this isolated compiler,
+source and environment**, not universal cross-compiler output.
+Genuine non-SYSTEM Windows tokens, IDA/Hopper integrations and
+other architectures remain unverified. Nothing was installed
+globally or changed in desktop Session 2, production MCP,
+game or service.
 
 ## Remaining validation and release boundaries
 
