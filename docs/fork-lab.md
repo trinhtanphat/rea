@@ -306,6 +306,33 @@ digests were checked afterward and remained unchanged. This verifies
 the artifact policy did not regress in these test cases; it is not
 a general malicious-binary sandbox or substitute for provider tests.
 
+## Preview-first upstream fork refs synchronization (2026-10-26)
+
+REA upstream `main` may advance several times during a single lab run.
+Use the **manual, preview-first** script instead of force-pushing
+or overwriting fork refs:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-safe-upstream-sync.ps1
+    powershell.exe -NoProfile -File .\scripts\fork-lab-safe-upstream-sync.ps1 -Apply
+
+The first command is **read-only** and reports upstream/fork heads,
+tags and differences. The second command creates missing upstream
+heads/tags and **non-force fast-forwards only existing branches
+whose fork commit is an ancestor of the fetched upstream commit**.
+It validates exact source SHAs after fetching and rejects a dirty
+working tree or incorrect origin/upstream GitHub URLs.
+
+It **never deletes refs or force-pushes**, never overwrites
+divergent tags/branches, and **explicitly preserves the intentionally
+divergent release-please branch** even if its upstream lineage changes.
+No GitHub Actions, repeating background task, global Git setting
+or automatic merge is created. On the first actual lab apply,
+the script safely **fast-forwarded one upstream `main` ref**, preserved
+one divergent release branch, and verified **zero missing upstream
+refs** (209 source refs / 229 fork refs at that snapshot). A completed
+run validates the absence of missing upstream ref names, but
+upstream may add new commits immediately afterward.
+
 ## Cross-Node native and Electron Evidence matrix (2026-10-26)
 
 The pinned hardened Windows native addon (SHA-256
