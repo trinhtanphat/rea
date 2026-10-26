@@ -323,6 +323,11 @@ The C++ fixture source in lab PR #1 exports rea_lab_add and
 rea_lab_mix. An 85850-byte MinGW-built PE32+ Windows x64 DLL was
 transferred as a hash-checked, never-executed fixture, SHA-256
 f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41.
+A separate isolated rebuild of the source did **not** produce a
+byte-identical DLL, even with a disabled PE timestamp. The real
+Ghidra evidence therefore pins exactly the checked fixture bytes;
+we **do not claim reproducible binary output** across staging
+directories. Future recompiled DLLs must receive an independent digest.
 
 All Ghidra-specific scoped doctor checks were **healthy**, including
 the native Windows x64 decompile.exe, Ghidra 12.1.4 headless launcher,
