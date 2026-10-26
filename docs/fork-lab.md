@@ -199,6 +199,34 @@ For an alternative .NET reference fixture, provide
 -ManagedAssemblyPath with an absolute path to a permitted local assembly.
 Keep sample files below the 64 MiB PE reader default and do not expand
 runtime privileges to make a test pass.
+## Official native addon artifact integrity regression (2026-10-26)
+
+The official REA verifier `scripts/verify-windows-native-artifact.mjs`
+passed on both separately installed lab packages: the published REA 6.8.0
+addon and the patched PR #2 addon. It verifies package/manifest identity,
+Windows x64 PE32+ header, Node-API 8, ABI and SHA-256.
+
+The repeatable **negative** suite is
+`scripts/fork-lab-artifact-guards.ps1`:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-artifact-guards.ps1 -LabRoot C:\REA-LAB -PackageRoot C:\REA-LAB\runtime\node_modules\rea-agents-pr2
+
+It creates unique fixture directories under `C:\REA-LAB\artifacts`,
+copies only the verifier, metadata and native addon from the chosen lab
+package, then tests six conditions without loading the native module:
+one unmodified valid artifact, a wrong manifest digest, an incorrect
+package version, an unsupported Node-API manifest version, a PE with its
+machine architecture changed from x64 despite a recomputed honest digest,
+and a damaged PE signature with a recomputed honest digest.
+Valid cases must exit 0; every mutation must exit nonzero with the
+expected error class. Each verifier subprocess has a 12-second timeout.
+
+Actual results on WIN11-181: **6/6 patched PR #2**, **6/6 published
+REA 6.8.0** (**12/12 assertions**). Both installed package binary
+digests were checked afterward and remained unchanged. This verifies
+the artifact policy did not regress in these test cases; it is not
+a general malicious-binary sandbox or substitute for provider tests.
+
 ## Testing a repository or a program
 
 A GitHub source repository is not itself a native binary. First establish the
