@@ -199,6 +199,36 @@ For an alternative .NET reference fixture, provide
 -ManagedAssemblyPath with an absolute path to a permitted local assembly.
 Keep sample files below the 64 MiB PE reader default and do not expand
 runtime privileges to make a test pass.
+## Isolated native DACL rejection matrix (2026-10-26)
+
+On WIN11-181, the **source-built PR #2** Windows native addon was tested
+under LocalSystem with the directly exposed read-only
+`cutter_bridge_verify_directory` operation. This permits precise checking
+of security policy without running an unknown target or deploying the addon.
+
+The repeatable test is `scripts/fork-lab-native-acl-negative.ps1`:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-native-acl-negative.ps1 -LabRoot C:\REA-LAB -PatchedAddonPath C:\REA-LAB\artifacts\native-pr2-6b3443\rea-windows-x64.node -ExpectedAddonSha256 2ef814532639a53f6a490bc8631db96be8c59b2e1ce48ef863dbfdaadf1e65a6
+
+The script verifies the digest of the selected addon, creates unique
+test-owned directories under `C:\REA-LAB\artifacts`, and reads the
+actual Windows owner and ACL protection/count before making native calls.
+Expected results: one valid protected SYSTEM-only full-access directory
+is admitted; five invalid cases are rejected with Win32 5: extra
+Administrators trustee, missing inherit flags, a reduced access mask,
+an additional deny ACE, and an **unprotected DACL**. Note that Windows
+canonicalized an initially unprotected directory to protected at
+creation, so the final negative case explicitly enables inheritance
+on **its own newly created fixture only** and verifies readback.
+No pre-existing or production ACL is edited.
+
+Actual results: **6/6 passed** against the pinned patched addon,
+SHA-256 `2ef814532639a53f6a490bc8631db96be8c59b2e1ce48ef863dbfdaadf1e65a6`.
+The extra-deny-ACE fixture is refused during path opening; the remaining
+negative cases reach the native DACL checks. This validates these exact
+LocalSystem rejection boundaries, not a normal-user runtime or a real
+decompiler provider.
+
 ## Official native addon artifact integrity regression (2026-10-26)
 
 The official REA verifier `scripts/verify-windows-native-artifact.mjs`
