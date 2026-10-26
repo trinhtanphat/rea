@@ -430,6 +430,45 @@ non-SYSTEM native-addon coverage**; the reason for the task's
 failure was not confirmed, and no further privilege/ACL workaround
 was attempted. Do not conflate this with a normal Windows user test.
 
+## SID oracle negative-control strengthening (lab commit `a81fe85`)
+
+A four-lane Windows native verifier suite now passes on WIN11-181
+under LocalSystem, based on the exact hardened PR #2 addon:
+
+1. Unmodified independent-SID verifier: **23 filesystem/native
+   checks plus 8 process checks PASS, exit 0**.
+2. Fake *self-consistent* `userIsSystem` and ACE count in the
+   observer: **rejected, exit 1**.
+3. A fake `whoami.exe` prepended to PATH: **ignored**, source
+   verifier still passes using the absolute System32 executable.
+4. Source-level fault injection changing only the verifier's
+   SID-oracle path to an absent lab directory: **rejected, exit 1**.
+
+Source: [PR #1 runner](https://github.com/trinhtanphat/rea/blob/chore/windows181-lab-preflight/scripts/fork-lab-sid-observer-negative.mjs),
+commit `a81fe85485d28c70ea60d938d601054684344b1e`.
+Evidence directory:
+`C:\REA-LAB\artifacts\native-sid-observer-v2Ap5O`.
+
+**Important test-harness boundary:** replacing the actual Windows
+`SystemRoot` process environment prevents Node 24.22.1's own
+CSPRNG from initializing *before the verifier executes*. The
+fourth test therefore modifies **only an isolated copy of the
+verifier source**, keeping the real process environment untouched.
+It tests fail-closed behavior of the source-level identity oracle,
+not an external Windows `SystemRoot` fault.
+
+### Non-SYSTEM service token: still not verified
+
+Two isolated LocalService Task Scheduler identity attempts could
+not produce a user-SID report (last task result 1). The second
+attempt used valid script syntax and a narrowly scoped
+`S-1-5-19` modify ACE **only on one disposable lab fixture
+directory**. Even then no report appeared; the task was deleted
+and its temporary explicit ACE removed successfully. Do not
+claim normal-user or LocalService native conformance from
+these attempts. No production directory ACL, persistent account
+or interactive Session 2 setting was altered.
+
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` due **other** optional engines and registrations (such as Hopper/IDA/JADX). Ghidra 12.1.4 with JDK 21 is **now present in the isolated lab** and all Ghidra-specific scoped doctor checks are healthy, with a real PE x64 CLI analysis/search/decompile passing. **Do not report the entire wide audit as healthy**.
