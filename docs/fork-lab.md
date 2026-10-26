@@ -333,7 +333,23 @@ tags and differences. The second command creates missing upstream
 heads/tags and **non-force fast-forwards only existing branches
 whose fork commit is an ancestor of the fetched upstream commit**.
 It validates exact source SHAs after fetching and rejects a dirty
-working tree or incorrect origin/upstream GitHub URLs.
+working tree or incorrect origin/upstream GitHub URLs. The remote URL
+validation is **strictly anchored at the beginning and end of the full
+string** and only permits the expected HTTPS or SSH GitHub host and
+exact `trinhtanphat/rea` origin / `morluto/rea` upstream paths.
+This explicitly blocks an attacker-controlled remote whose **URL path
+contains `github.com/trinhtanphat/rea`**, even if the text previously
+matched a loose suffix-based regex. The allowlist is shared with an
+offline, repeatable regression test:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-github-remote-guard-test.ps1
+
+Observed WIN11-181 result: **22/22 checks pass** (7 expected HTTPS/SSH
+remotes accepted; 15 impersonations, unwanted userinfo/ports,
+HTTP/file schemes, query/fragments and wrong owners rejected).
+The real origin/upstream URLs were also checked against the guard;
+both passed. This regression makes **no network request or Git
+mutation**.
 
 It **never deletes refs or force-pushes**, never overwrites
 divergent tags/branches, and **explicitly preserves the intentionally

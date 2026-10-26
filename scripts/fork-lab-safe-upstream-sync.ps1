@@ -34,9 +34,10 @@ if ([IO.Path]::GetFullPath($top).TrimEnd('\') -ne $repo.TrimEnd('\')) {
 }
 $origin = @((Invoke-Git -Arguments @('remote','get-url','origin')))[0]
 $upstream = @((Invoke-Git -Arguments @('remote','get-url','upstream')))[0]
-if ($origin -notmatch '(?i)(?:github\.com[:/])trinhtanphat/rea(?:\.git)?$' -or
-    $upstream -notmatch '(?i)(?:github\.com[:/])morluto/rea(?:\.git)?$') {
-    throw 'Remote origin/upstream URLs do not match the expected public REA repositories.'
+. (Join-Path $PSScriptRoot 'fork-lab-github-remote-guard.ps1')
+if (-not (Test-ReaGitHubRemote -Url $origin -Owner 'trinhtanphat') -or
+    -not (Test-ReaGitHubRemote -Url $upstream -Owner 'morluto')) {
+    throw 'Remote origin/upstream URLs are not exactly the expected REA GitHub host and repository.'
 }
 $dirty = @(Invoke-Git -Arguments @('status','--porcelain'))
 if ($dirty.Count -ne 0 -and @($dirty | Where-Object { $_.Length -gt 0 }).Count -gt 0) {
