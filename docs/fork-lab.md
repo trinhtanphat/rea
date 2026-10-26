@@ -418,9 +418,47 @@ C:\REA-LAB\artifacts. Every REA process is limited to four logical
 CPUs, BelowNormal priority, Java heap -Xmx1024m, bounded output and
 150 seconds maximum. The tests do not install Ghidra/Java globally.
 
+### Real REA/Ghidra MCP stdio (2026-10-26)
+
+A **separate, actual MCP protocol run** now passes for the same
+source-owned PE x64 DLL, with Ghidra 12.1.4, Corretto JDK 21.0.13
+and the SHA-pinned hardened REA addon. The repeatable client is
+`scripts/fork-lab-ghidra-mcp-smoke.mjs`:
+
+    C:\REA-LAB\toolchains\node-v24.22.1-win-x64\node.exe scripts\fork-lab-ghidra-mcp-smoke.mjs C:\REA-LAB
+
+This client starts an independent `rea-agents-pr2-hardened` **stdio
+MCP server**, never editing the Private Commander MCP configuration.
+It performs JSON-RPC `initialize` (negotiated protocol 2025-06-18),
+`notifications/initialized`, `tools/list` (**229 advertised tools**),
+then four supported **real** Ghidra MCP tool calls:
+
+1. `open_binary` with the exact verified DLL path and `provider_id=ghidra`;
+2. `binary_overview` with no arguments (the selected target is retained
+   by the server, rather than passed to this tool);
+3. `search_procedures` with pattern `rea_lab_`, finding both
+   `rea_lab_add` and `rea_lab_mix`;
+4. `procedure_pseudo_code` for `rea_lab_add`, recovering its
+   source-owned `return ... + 7;` calculation.
+
+**All four MCP calls PASS** under LocalSystem. The script verifies
+the addon and DLL SHA-256 first; it asserts the returned Ghidra
+provenance, names, pseudocode and absence of MCP error replies. It
+stores the tool catalog, all four results, a summary and server stderr
+under a unique `C:\REA-LAB\artifacts\ghidra-mcp-real-*` folder.
+The successful run used protocol 2025-06-18, tool count 229 and
+produced a 17155-byte normalized MCP `binary_overview` response
+(SHA-256 `f4b0caa3fded4662fac3fc8b80933c824fc0587abafb3d92b061605e70f336b0`).
+The successful fixture is under
+`C:\REA-LAB\artifacts\ghidra-mcp-real-VLVf17`. All subprocesses
+exited and no native probes remain. No account, Session 2 desktop,
+system environment, installed provider or production MCP was altered.
+
 **Remaining coverage:** a genuine non-SYSTEM Windows user token,
-real IDA/Hopper providers, broader target architectures and real
-Ghidra MCP workflows are still unverified. Keep the patch PR draft.
+real IDA/Hopper integrations, and broader target formats/architectures
+are unverified. The verified MCP scope is **these four Ghidra tools**
+on one synthetic PE x64 DLL, not the complete 229-tool catalog.
+Keep the fix PR draft.
 
 ## Ghidra 12.1.4 and JDK 21 lab archive readiness — historical preflight (2026-10-26)
 
