@@ -371,6 +371,20 @@ No network requests, production Git remote changes or ref mutations
 are performed by these offline tests. Test evidence is saved only
 under newly created isolated lab directories.
 
+**Additional Git URL rewrite checks — awaiting WIN11-181 re-test:**
+The lab test suite now includes two further negative scenarios for
+`url.https://attacker.invalid/.pushInsteadOf` and
+`url.https://attacker.invalid/.insteadOf`. In a separate isolated
+Git fixture, the first rewrote an otherwise valid GitHub **push**
+destination to the attacker domain, while the second rewrote both
+the origin **fetch and push** destinations. These Git URL resolution
+semantics were independently reproduced; however, the added
+PowerShell integration cases have **not yet been run on WIN11-181**
+because its Private Commander tunnel-client was disconnected.
+Therefore the verified Windows result remains **28/28**, not 30/30,
+until the new cases pass on that host. The source and test changes
+are confined to the draft PR, with no CI or production activation.
+
 It **never deletes refs or force-pushes**, never overwrites
 divergent tags/branches, and **explicitly preserves the intentionally
 divergent release-please branch** even if its upstream lineage changes.
