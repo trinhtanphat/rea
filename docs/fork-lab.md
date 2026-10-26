@@ -787,6 +787,16 @@ No target bytes, production MCP, Session 2 or global provider settings
 were changed. The occasional prior second-overview timeout is still
 not root-caused and should not be declared fixed from this pass.
 
+**Ghidra MCP five-run postmortem (2026-10-26):**
+The read-only `scripts/fork-lab-ghidra-mcp-postmortem.mjs` analyzes
+five pinned lab Evidence directories. Four second-overview runs passed
+(53,006; 51,779; 51,853; 40,412 ms); the failed second overview
+took 127,273 ms server-side, exceeding the smoke client's 125,000 ms
+deadline by 2,273 ms. The old failed run predates client RPC timing
+capture. Three invalid directory input tests were rejected. No binary
+was executed and no runtime settings or timeouts changed.
+This identifies a deadline boundary, not the root cause of the stall.
+
 **Remaining coverage:** genuine ordinary Windows user token native
 verification, real IDA/Hopper integrations, and broader target
 formats/architectures remain unverified. The verified Ghidra MCP scope
