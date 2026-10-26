@@ -71,6 +71,17 @@ Returned **exit 0**, provider `rea-javascript-application`, structured Evidence 
 `c764daf2c4a3126ffe48acb7e34eb69c47799399dbcedef34ea5af18b76570e6`.
 There were no residual `rea-native-probe-*` or `rea-native-conformance-*` directories in the isolated lab temp after verification.
 
+## Direct native addon A/B regression under LocalSystem
+
+An automated same-host comparison was added to [lab PR #1](https://github.com/trinhtanphat/rea/pull/1) as `scripts/fork-lab-native-ab.ps1`. On 2026-10-26, both addon files were copied to unique isolated fixture directories and inspected with the same portable Node 24.22.1, the same LocalSystem token and `C:\\REA-LAB\\tmp`:
+
+| Artifact | SHA-256 | Native result |
+| --- | --- | --- |
+| Original published REA 6.8.0 | `6a015bfefee7fafb6cbaf659f040170848a45425bbcef6caf962fd39b6ff7b` | **Exit 1**, historical `Private DACL contains unexpected trustees`, **Win32 5** |
+| Source-patched PR #2 | `2ef814532639a53f6a490bc8631db96be8c59b2e1ce48ef863dbfdaadf1e65a6` | **Exit 0**, `privateDacl=true` and native capability inspection passes |
+
+The script performs checksum assertions before loading the binary, preserves both installed addon files, writes only its own new lab fixture directories and returns a machine-checked JSON result. This directly demonstrates the specific LocalSystem native behavior change; it is not proof of operation under an ordinary Windows user token.
+
 ## Side-by-side static parser regression
 
 The lab matrix on [draft PR #1](https://github.com/trinhtanphat/rea/pull/1) now accepts an explicitly selected `-CliPath` only for a REA `scripts\\rea.mjs` located under `C:\\REA-LAB`. The same six parser-only model-header / managed-.NET / PE valid-and-invalid cases were rerun on 2026-10-26 against both package copies:
