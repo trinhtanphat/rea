@@ -385,8 +385,14 @@ and client registrations such as Hopper/IDA/JADX are absent.
 
 The source-owned fixture is scripts/fixtures/rea-ghidra-arithmetic.cpp.
 Its 85850-byte PE32+ DLL was compiled using only the isolated MinGW
-toolchain on PVE161 and **was never executed**. Source DLL SHA-256:
+toolchain on PVE161 and **was never executed**. The exact DLL tested on
+WIN11-181 has SHA-256:
 f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41.
+A rebuild of the C++ fixture in a separate isolated staging directory
+did **not** produce a byte-identical DLL, despite a disabled PE timestamp.
+This test therefore pins the **actual inspected DLL bytes**, not an
+unproved bit-for-bit reproducible PE build. Recompiled samples must be
+re-hashed and separately admitted before running a new assertion set.
 Local path: C:\REA-LAB\fixtures\ghidra-pe-arithmetic\rea_lab_arithmetic.dll.
 
 Reproduce the bounded, real Ghidra integration test using:
