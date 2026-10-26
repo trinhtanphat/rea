@@ -528,11 +528,32 @@ and `/var/tmp/rea-native-build-20261026/fixtures/pe-repro-jrGlPByX`.
 
 This establishes **byte-for-byte reproducibility on the same isolated
 PVE161 toolchain and verified source**, not across arbitrary compilers,
-environments or OS versions. The older Windows Ghidra positive
-regression still targets the separate original DLL and pinned digest;
-the deterministic DLL must be separately admitted and analyzed
-before claiming real Windows Ghidra execution of these newer bytes.
-Original Windows fixture location:
+environments or OS versions.
+
+**Follow-up actual Windows Ghidra analysis: PASS.** One deterministic
+85853-byte PE DLL produced by the above script was copied from
+PVE161 into the separate fixture directory
+`C:\REA-LAB\fixtures\ghidra-pe-reproducible` via a short-lived,
+one-use IP-restricted HTTP listener. The destination SHA-256 was
+verified **before** analysis. REA's actual `analyze --provider ghidra
+--json` under WIN11-181 LocalSystem completed **exit 0**, and the
+Ghidra analysis Evidence explicitly reported subject SHA-256
+`8be0a6f9f9ae5a18e2dcf65f0e0b21d0034b968c6606fb112b07133f372da299`
+with provider **Ghidra 12.1.4**. The Evidence JSON SHA-256 was
+`8d0ff274867a917ff31888d0ec953952492e9b04461f36c81996a6ffa78bdd1e`.
+Captured output:
+`C:\REA-LAB\artifacts\ghidra-deterministic-pe-analysis-20261026`.
+The trial used BelowNormal priority, four logical CPUs and a
+per-process Java heap maximum of 1 GiB. It did **not** execute the
+target PE, replace the older DLL, change system Java, edit desktop
+Session 2 or modify any live service.
+
+The older full analyze/search/decompile Windows/MCP regressions
+**still use their separate original 85850-byte DLL and digest**.
+The deterministic 85853-byte DLL has now passed real Ghidra
+**analysis only**; do not mislabel it as passing the full
+search/decompile suite until those calls run against its exact
+SHA-256. Original Windows fixture location:
 `C:\REA-LAB\fixtures\ghidra-pe-arithmetic\rea_lab_arithmetic.dll`.
 
 Reproduce the bounded, real Ghidra integration test using:
