@@ -9,6 +9,36 @@ The Private Commander host on WIN11-181 executes as `NT AUTHORITY\\SYSTEM` (SID 
 
 The independent readback proof in [draft PR #1](https://github.com/trinhtanphat/rea/pull/1) uses actual Win32 `CreateDirectoryW` and `GetFileSecurityW` APIs. Two identical SYSTEM full-control ACEs in the input returned **one** on NTFS; different SYSTEM + Administrators ACEs returned **two**. This PR's source change constructs one explicit ACE only if those principals are identical. Ordinary user accounts retain two ACEs and the native verifier still requires exact ACE count, owner, inheritance, mask, trustee and protected DACL.
 
+## Independent Windows caller SID assertion (commit `6216f8c`)
+
+The first revision of the Windows conformance verifier compared
+`acl.userIsSystem` with **itself**, leaving the root ACE-count assertion
+dependent on potentially self-consistent bad observations. Commit
+`6216f8c4ee38e2b766c643bff3d66252bc34c536` now uses a separate,
+bounded `whoami.exe /user /fo csv /nh` child process to determine the
+current process SID independently of the .NET/PowerShell ACL observer.
+The expected `userIsSystem` flag and expected **1 ACE for SYSTEM /
+2 ACEs otherwise** derive from that independently measured SID.
+
+On WIN11-181 (Windows LocalSystem SID `S-1-5-18`), the exact updated
+source verifier was copied to an isolated validation workspace:
+**exit 0**, `ok=true`, **23 native/filesystem controls and 8 process
+checks passed**. Conformance output SHA-256:
+`867ef230261b86fce09090a0dc1e43d4bdec51f598846901dab92e562fabce6f`.
+
+The repeatable **fault-injection negative control** is committed to
+[lab PR #1](https://github.com/trinhtanphat/rea/pull/1), commit
+`c5c64b6`, as `scripts/fork-lab-sid-observer-negative.mjs`.
+It creates two fresh validation workspaces containing the same source
+verifier and helper modules. The unmodified verifier passed **31/31
+assertions, exit 0**. A modified observer that falsely reports the
+**opposite caller SID classification and matching wrong ACE count**
+was rejected at the independent `userIsSystem` assertion with
+**exit 1**. The test runner itself reported `ok=true`, and its
+generated files remained below `C:\REA-LAB\artifacts`.
+This validates that the assertion catches this injected observation
+error; it is **not** a genuine non-SYSTEM login/host test.
+
 ## Updated protected-root ACE flag hardening (code commit `3e375a39`)
 
 Further on-host ACL probes found that the **first** patched Windows addon
