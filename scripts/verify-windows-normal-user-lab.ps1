@@ -6,7 +6,9 @@
   A read-only launcher for an already-authenticated user's desktop or
   non-SYSTEM shell. It never changes user tokens, ACLs, services or global
   packages. The package must be a copy under a dedicated lab directory.
-  This script intentionally refuses to run as LocalSystem.
+  This script rejects LocalSystem, LocalService, NetworkService and any
+  process token carrying the Windows SERVICE group (S-1-5-6); those are
+  not valid evidence of an ordinary Windows user even if non-SYSTEM.
 #>
 [CmdletBinding()]
 param(
@@ -22,8 +24,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-if ($identity.User.Value -eq 'S-1-5-18') {
-    [Console]::Error.WriteLine('Normal-user native verification requires an existing authorized non-SYSTEM shell.')
+$sid = $identity.User.Value
+$serviceSidSet = @('S-1-5-18','S-1-5-19','S-1-5-20')
+$serviceGroup = @($identity.Groups | ForEach-Object { $_.Value }) -contains 'S-1-5-6'
+if ($serviceSidSet -contains $sid -or $serviceGroup) {
+    [Console]::Error.WriteLine('Normal-user native verification requires an authorized ordinary Windows user token, not a Windows service account.')
     exit 2
 }
 

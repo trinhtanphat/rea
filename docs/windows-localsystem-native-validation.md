@@ -607,12 +607,45 @@ other architectures remain unverified. Nothing was installed
 globally or changed in desktop Session 2, production MCP,
 game or service.
 
+## Non-SYSTEM Windows service token conformance and normal-user admission guard (2026-10-26)
+
+An isolated, short-lived, noninteractive Windows Task Scheduler
+invocation on WIN11-181 ran the exact PR #2 Windows native source verifier
+with the hardened addon under **NT AUTHORITY\LOCAL SERVICE**, SID
+**S-1-5-19**, Session **0**. The real native process returned **exit 0**,
+with **23 filesystem/native controls and 8 process checks (31/31 PASS)**.
+The native Evidence JSON SHA-256 was
+22179bcf73395a91688446900148d64250176aa0f4f554d1bd87decb52c05cb2.
+Evidence lives exclusively in
+C:\REA-LAB\artifacts\localservice-native-4278e73a5da84cfd9253e446d6399b54.
+Only a newly created lab-owned artifacts subdirectory was granted
+LOCAL SERVICE modify access. The temporary task was unregistered after
+completion; no Windows user account, production ACL, service, or Session 2
+configuration changed.
+
+**Classification caveat:** LOCAL SERVICE is a genuine non-SYSTEM
+**service account**, not an ordinary Windows user's token. This
+successful native conformance run cannot close the release requirement
+for a normal interactive or legitimately launched user account.
+The old normal-user lab launcher had rejected only
+S-1-5-18, so it could mislabel service principals as ordinary users.
+The script scripts/verify-windows-normal-user-lab.ps1 now rejects
+S-1-5-18, S-1-5-19, S-1-5-20 and any token carrying the
+Windows SERVICE group S-1-5-6 **before creating output
+or executing the verifier**. PowerShell parse plus git diff --check
+passed; SYSTEM and actual LOCAL SERVICE invocation both failed closed
+with the expected **exit 2**. The temporary LOCAL SERVICE guard task was
+also removed after testing; guard Evidence:
+C:\REA-LAB\artifacts\rea-pr2-service-guard-20261026\guard-summary.json.
+This guard has not been positively exercised under a legitimate
+ordinary Windows user token, so both PRs remain Draft and undeployed.
+
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` due **other** optional engines and registrations (such as Hopper/IDA/JADX). Ghidra 12.1.4 with JDK 21 is **now present in the isolated lab** and all Ghidra-specific scoped doctor checks are healthy, with a real PE x64 CLI analysis/search/decompile passing. **Do not report the entire wide audit as healthy**.
 - The patched addon has **not** been executed under a distinct ordinary Windows user SID. A further native API proof using the real SID of an existing non-SYSTEM interactive account as an **explicit ACL trustee** returned two distinct ACEs for that SID and SYSTEM (3/3 ACL readback cases now pass). This remains a synthetic DACL case, not a native addon run under that user's token.
 - An authenticated interactive `Admin` session 2 is present on WIN11-181. An attempted direct desktop `WIN+R` input returned `SendInput inserted 0/4 events; UIPI/elevation may be blocking desktop input`. No further UI/privilege workaround was attempted. The existing user session was not altered.
-- A reusable, fail-closed non-SYSTEM conformance launcher is added as `scripts/verify-windows-normal-user-lab.ps1`. It requires an explicit isolated lab package, source verifier, Node path and artifact SHA-256, and uses the caller's normal token without changing accounts or ACLs. PowerShell 5.1 syntax check **passed** and a LocalSystem invocation was **rejected with exit 2**. Its **positive non-SYSTEM execution remains unverified**, so do not mark the normal-user requirement complete.
+- A reusable, fail-closed non-SYSTEM conformance launcher is added as `scripts/verify-windows-normal-user-lab.ps1`. It requires an explicit isolated lab package, source verifier, Node path and artifact SHA-256, and uses the caller's normal token without changing accounts or ACLs. PowerShell 5.1 syntax checks **passed**; LocalSystem and a real LocalService service-token invocation were both **rejected with exit 2**. The underlying native verifier separately passed 31/31 under LocalService, but the **positive ordinary-user execution remains unverified**, so do not mark the normal-user requirement complete.
 - Real **Ghidra 12.1.4 PE x64 CLI and four-tool MCP stdio** analysis/search/decompile are now **verified** under LocalSystem only. Broader Ghidra MCP tools and target families, IDA/Hopper workflows, extended product CI, GitHub Actions and production service installation remain **unverified**.
 - The upstream Win32 5 *delete-by-handle* report (#1701) describes a different symptom and is not marked fixed by this PR.
 - **Do not merge or deploy into the live game, Private Commander, global tools or fork main merely because the LocalSystem and one real Ghidra PE x64 lane pass.** Keep draft until the genuine normal-user token test, other required provider regressions, a reviewed diff and a deliberate merge decision.
