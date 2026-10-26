@@ -348,8 +348,28 @@ Observed WIN11-181 result: **22/22 checks pass** (7 expected HTTPS/SSH
 remotes accepted; 15 impersonations, unwanted userinfo/ports,
 HTTP/file schemes, query/fragments and wrong owners rejected).
 The real origin/upstream URLs were also checked against the guard;
-both passed. This regression makes **no network request or Git
+both passed. This first regression makes **no network request or Git
 mutation**.
+
+**Additional Git push destination protection (2026-10-26):** Git
+permits `remote.origin.pushurl` and multiple URLs that differ from
+the visible origin fetch URL. The sync now validates **every effective
+origin fetch endpoint, origin push endpoint (including pushInsteadOf
+rewrites), and upstream fetch endpoint** before a preview or push.
+Each list must contain **exactly one endpoint**, and all must match
+the explicitly allowed GitHub host and exact repository path.
+The offline regression uses six isolated Git repositories in
+`C:\REA-LAB\artifacts` with the actual git remote get-url commands:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-github-remote-endpoints-test.ps1
+
+**6/6 cases passed**: valid default origin/push and explicit SSH
+push were accepted; malicious pushurl, extra pushurl, malicious
+upstream and multiple upstream fetch URLs were rejected. Including
+the original 22 URL test cases, **28/28 remote-validation cases pass**.
+No network requests, production Git remote changes or ref mutations
+are performed by these offline tests. Test evidence is saved only
+under newly created isolated lab directories.
 
 It **never deletes refs or force-pushes**, never overwrites
 divergent tags/branches, and **explicitly preserves the intentionally
