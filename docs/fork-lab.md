@@ -758,11 +758,41 @@ root cause remains unknown. These timings characterize different
 runs and should not be interpreted as a fixed performance guarantee.
 The Session 2 desktop and production MCP were not used.
 
-**Remaining coverage:** a genuine non-SYSTEM Windows user token,
-real IDA/Hopper integrations, and broader target formats/architectures
-are unverified. The verified MCP scope is **these four Ghidra tools**
-on one synthetic PE x64 DLL, not the complete 229-tool catalog.
-Keep the fix PR draft.
+**Opt-in extra Ghidra MCP read-only operations (2026-10-26):**
+The repeatable MCP smoke runner now accepts --extended in combination
+with the optional --deterministic source-owned DLL selector, without
+changing its original four-tool behavior when --extended is absent:
+
+    C:\REA-LAB\toolchains\node-v24.22.1-win-x64\node.exe scripts\fork-lab-ghidra-mcp-smoke.mjs C:\REA-LAB --deterministic --extended
+
+The extended lane adds real MCP calls for procedure_address,
+procedure_info and procedure_assembly, selecting only the source-owned
+rea_lab_add function. Each result is required to be successful and
+must report Ghidra as its provider and the same pinned target digest.
+Duplicate or unrecognized CLI flags are explicitly rejected (both
+negative invocations returned exit 1).
+
+Actual WIN11-181 LocalSystem execution on the 85,853-byte
+deterministic PE x64 completed **PASS, exit 0** with **17 RPC entries**.
+The three additional read-only operations passed with elapsed times
+10 ms, 15 ms and 7 ms respectively. The first Ghidra binary_overview
+took 41,892 ms, and the second overview after close/reopen took
+40,420 ms. The two intentionally invalid calls returned tool errors;
+the expected decompiler output and final closed binary session
+also passed. The process and native-probe cleanup check found no
+leftovers. The additional three tool result files, complete timing
+trace and summary are in
+C:\REA-LAB\artifacts\ghidra-mcp-real-KZXyq6.
+No target bytes, production MCP, Session 2 or global provider settings
+were changed. The occasional prior second-overview timeout is still
+not root-caused and should not be declared fixed from this pass.
+
+**Remaining coverage:** genuine ordinary Windows user token native
+verification, real IDA/Hopper integrations, and broader target
+formats/architectures remain unverified. The verified Ghidra MCP scope
+is four baseline read-only operations plus three opt-in operations
+on one synthetic PE x64 DLL, **not all 229 advertised tools**.
+Keep both PRs Draft, unmerged and undeployed.
 
 ## Ghidra 12.1.4 and JDK 21 lab archive readiness — historical preflight (2026-10-26)
 

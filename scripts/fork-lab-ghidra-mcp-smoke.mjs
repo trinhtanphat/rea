@@ -2,7 +2,8 @@
 /**
  * Real REA MCP stdio smoke against the source-owned PE x64 fixture.
  * Constrains input paths, pins native addon/target digests, scopes environment,
- * sends initialize -> tools/list -> one read-only binary_overview request.
+ * exercises read-only Ghidra MCP search/decompile and close/reopen lifecycle;
+ * optional --extended adds three more read-only procedure queries.
  * Does not register MCP with any agent or touch desktop/session 2.
  */
 import assert from "node:assert/strict";
@@ -18,9 +19,12 @@ const root = resolve(process.argv[2] ?? "C:\\REA-LAB");
 assert.equal(root.toLowerCase(), "c:\\rea-lab", "Unexpected lab root");
 const pkg = join(root, "runtime", "node_modules", "rea-agents-pr2-hardened");
 const native = join(pkg, "native", "windows", "build", "rea-windows-x64.node");
-const deterministic = process.argv[3] === "--deterministic";
-assert.ok(process.argv.length <= 4 && (process.argv[3] === undefined || deterministic),
-  "Usage: node fork-lab-ghidra-mcp-smoke.mjs C:\\REA-LAB [--deterministic]");
+const flags = process.argv.slice(3);
+assert.ok(flags.every(flag => ["--deterministic","--extended"].includes(flag))
+  && new Set(flags).size === flags.length,
+  "Usage: node fork-lab-ghidra-mcp-smoke.mjs C:\\REA-LAB [--deterministic] [--extended]");
+const deterministic = flags.includes("--deterministic");
+const extended = flags.includes("--extended");
 const fixtureDir = deterministic ? "ghidra-pe-reproducible" : "ghidra-pe-arithmetic";
 const target = join(root, "fixtures", fixtureDir, "rea_lab_arithmetic.dll");
 const cli = join(pkg, "scripts", "rea.mjs");
@@ -166,6 +170,32 @@ try {
   assert.ok(pseudoText.includes("rea_lab_add") && /return[^;]*\+[^;]*7/u.test(pseudoText),
     "MCP Ghidra pseudocode did not reconstruct the source-owned +7 function");
   await writeFile(join(workspace,"pseudocode-result.json"),JSON.stringify(pseudo.result,null,2)+"\n",{flag:"wx"});
+  // Optional, read-only tool coverage beyond the baseline four operations.
+  // Keep the existing smoke behavior identical when --extended is omitted.
+  const extendedToolsPassed = [];
+  if (extended) {
+    for (const name of ["procedure_address","procedure_info","procedure_assembly"]) {
+      const contract = tools.find(tool => tool.name === name);
+      assert.ok(contract?.inputSchema?.properties?.procedure,
+        "Missing schema for extended Ghidra operation "+name);
+      const reply = await request("tools/call",
+        {name,arguments:{procedure:"rea_lab_add"}},60000);
+      assert.ok(reply.result && !reply.result.isError,
+        "Extended Ghidra operation failed: "+name+" "+
+          JSON.stringify(reply.error??reply.result).slice(0,1200));
+      const evidence = reply.result.structuredContent;
+      assert.equal(evidence?.subject?.digest?.sha256, expectedTarget,
+        "Extended tool target digest mismatch: "+name);
+      assert.equal(evidence?.provider?.id, "ghidra",
+        "Extended tool was not resolved by Ghidra: "+name);
+      const output = JSON.stringify(reply.result);
+      assert.ok(output.includes("rea_lab_add") || /0x180001[0-9a-f]+/i.test(output),
+        "Extended Ghidra output lacks source-owned function identity: "+name);
+      await writeFile(join(workspace,"extended-"+name+".json"),
+        JSON.stringify(reply.result,null,2)+"\n",{flag:"wx"});
+      extendedToolsPassed.push(name);
+    }
+  }
   // Use REA's own lifecycle operation to release the Ghidra provider,
   // rather than relying exclusively on stdin EOF/process termination.
   const closeTool=tools.find(t=>t.name==="close_binary");
@@ -220,6 +250,7 @@ try {
     JSON.stringify(finalSession.result,null,2)+"\n",{flag:"wx"});
   const summary={passed:true, protocolVersion:init.result.protocolVersion, toolCount:tools.length,
     toolsPassed:["open_binary","binary_overview","search_procedures","procedure_pseudo_code"],
+    extendedToolsPassed,
     fixtureKind:deterministic ? "reproducible-pe-x64" : "original-pe-x64",
     targetSha256:expectedTarget, addonSha256:expectedNative,
     overviewBytes:Buffer.byteLength(content), overviewSha256:createHash("sha256").update(content).digest("hex"),
