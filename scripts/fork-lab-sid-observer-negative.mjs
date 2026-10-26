@@ -34,7 +34,8 @@ const helpers = [
 ];
 const originalDir = join(workspace, "original", "scripts");
 const forgedDir = join(workspace, "forged", "scripts");
-for (const dest of [originalDir, forgedDir]) {
+const invalidOracleDir = join(workspace, "invalid-oracle", "scripts");
+for (const dest of [originalDir, forgedDir, invalidOracleDir]) {
   await mkdir(join(dest, "lib"), { recursive: true });
   for (const file of helpers)
     await copyFile(join(dirname(source), "lib", file), join(dest, "lib", file));
@@ -46,6 +47,16 @@ const originalScript = join(originalDir, "verify-windows-native.mjs");
 const forgedScript = join(forgedDir, "verify-windows-native.mjs");
 await writeFile(originalScript, code, { flag: "wx" });
 await writeFile(forgedScript, altered, { flag: "wx" });
+// Deliberately corrupt only the verifier's source-level oracle path.
+// Never mutate process.env.SystemRoot: Node's Windows CSPRNG bootstrap
+// requires a legitimate Windows system directory.
+const rootAnchor = "const systemRoot = process.env.SystemRoot ?? process.env.windir;";
+assert.equal(code.split(rootAnchor).length, 2, "Expected one SID oracle root declaration.");
+const invalidRoot = join(workspace, "nonexistent-system-root");
+const brokenOracleScript = join(invalidOracleDir, "verify-windows-native.mjs");
+const brokenOracleCode = code.replace(rootAnchor,
+  "const systemRoot = " + JSON.stringify(invalidRoot) + ";");
+await writeFile(brokenOracleScript, brokenOracleCode, { flag: "wx" });
 const env = { ...process.env, TEMP: join(lab, "tmp"), TMP: join(lab, "tmp") };
 const run = (script, runEnv = env) => {
   const result = spawnSync(process.execPath, [script, pkg], {
@@ -83,6 +94,15 @@ assert.equal(pathShadow.status, 0, "PATH-shadowed identity oracle: " + pathShado
 const shadowReport = JSON.parse(pathShadow.stdout);
 assert.equal(shadowReport.ok, true);
 await writeFile(join(workspace, "path-shadow-positive.json"), pathShadow.stdout, { flag: "wx" });
+// Fail closed if the oracle executable path is invalid, without poisoning
+// the Windows environment needed by the native Node.js runtime.
+const poisoned = run(brokenOracleScript);
+assert.notEqual(poisoned.status, 0,
+  "Verifier unexpectedly succeeded without the absolute SID oracle.");
+assert.match(poisoned.stderr, /ENOENT|whoami|system-root/u,
+  "Verifier should reject a missing SID oracle executable.");
+await writeFile(join(workspace, "invalid-oracle.stderr.txt"),
+  poisoned.stderr, { flag: "wx" });
 await writeFile(join(workspace, "positive.json"), positive.stdout, { flag: "wx" });
 await writeFile(join(workspace, "negative.stderr.txt"), negative.stderr, { flag: "wx" });
 const summary = {
@@ -92,6 +112,8 @@ const summary = {
     processChecks: Object.keys(parsed.processes).length, passed: true },
   negative: { exitCode: negative.status, forgedSidAndAceCountRejected: true },
   pathShadow: { exitCode: pathShadow.status, verified: true, cannotShadowSystemWhoami: true },
+  invalidOracle: { exitCode: poisoned.status, rejectedMissingIdentityOracle: true,
+    systemRootEnvironmentUnchanged: true },
   workspace,
   productionFilesModified: false,
 };

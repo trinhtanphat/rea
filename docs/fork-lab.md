@@ -212,16 +212,26 @@ LocalSystem service runner.
 The repeatable fault-injection test in
 `scripts/fork-lab-sid-observer-negative.mjs` uses the separately staged,
 exact PR #2 source verifier; it copies the four verifier helper modules
-into two **new** artifacts trees, runs one original verifier and then
+into three **new** artifacts trees, runs one original verifier and then
 deliberately forges a **self-consistent but incorrect** `userIsSystem`
 and ACE count in a copy of the PowerShell observation. A third run
 places a **copy of the trusted Windows cmd.exe** under the fake name
 `whoami.exe` in a dedicated lab directory prepended to the existing
 Windows Path. The legitimate verifier must continue to find its SID
 oracle by the absolute `SystemRoot\System32\whoami.exe` path, not
-by PATH search. All executions use Node.js with `shell: false`,
-bounded timeout/output and `C:\REA-LAB\tmp` against the hardened
-REA test package.
+by PATH search. A **fourth lane** deliberately changes the SID-oracle
+root path **only inside a source copy of the verifier** to a nonexistent
+lab directory. The verifier must exit nonzero on the invalid absolute
+identity executable rather than silently trusting the ACL observer.
+
+**Do not set an invalid `SystemRoot` process environment** to simulate
+this condition: on Node 24.22.1 it prevents Node's own CSPRNG
+initialization before the verifier runs. Source-level fault injection
+preserves the actual Windows process environment and isolates the
+error to the verifier's independent identity oracle.
+
+All executions use Node.js with `shell: false`, bounded timeout/output
+and `C:\REA-LAB\tmp` against the hardened REA test package.
 
     C:\REA-LAB\toolchains\node-v24.22.1-win-x64\node.exe scripts\fork-lab-sid-observer-negative.mjs C:\REA-LAB C:\REA-LAB\validation-pr2\scripts\verify-windows-native.mjs C:\REA-LAB\runtime\node_modules\rea-agents-pr2-hardened
 
@@ -230,8 +240,11 @@ Actual WIN11-181 results: the unmodified source verifier returned
 the deliberately forged observer returned **exit 1**, with the
 `userIsSystem` assertion mismatch. The verifier with fake
 `whoami.exe` prepended to the Windows Path **still returned exit 0**,
-because it used the absolute system executable. The runner reported
-`ok: true`, saved all three outputs in a new lab artifacts directory,
+because it used the absolute system executable. The fourth,
+source-modified verifier with a nonexistent oracle executable
+**failed closed (exit 1)** without changing `SystemRoot` for Node.
+The runner reported `ok: true` for all four lanes, saved outputs
+under `C:\REA-LAB\artifacts\native-sid-observer-v2Ap5O`,
 and did not modify installed packages, production ACLs, user tokens,
 services or interactive desktop session. This is negative-test
 coverage for the observer, not normal-user Windows token validation.
