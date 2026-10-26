@@ -18,13 +18,19 @@ const root = resolve(process.argv[2] ?? "C:\\REA-LAB");
 assert.equal(root.toLowerCase(), "c:\\rea-lab", "Unexpected lab root");
 const pkg = join(root, "runtime", "node_modules", "rea-agents-pr2-hardened");
 const native = join(pkg, "native", "windows", "build", "rea-windows-x64.node");
-const target = join(root, "fixtures", "ghidra-pe-arithmetic", "rea_lab_arithmetic.dll");
+const deterministic = process.argv[3] === "--deterministic";
+assert.ok(process.argv.length <= 4 && (process.argv[3] === undefined || deterministic),
+  "Usage: node fork-lab-ghidra-mcp-smoke.mjs C:\\REA-LAB [--deterministic]");
+const fixtureDir = deterministic ? "ghidra-pe-reproducible" : "ghidra-pe-arithmetic";
+const target = join(root, "fixtures", fixtureDir, "rea_lab_arithmetic.dll");
 const cli = join(pkg, "scripts", "rea.mjs");
 const ghidra = join(root, "toolchains", "ghidra1214-isolated", "ghidra_12.1.4_PUBLIC");
 const jdk = join(root, "toolchains", "jdk21-corretto-isolated", "jdk21.0.13_0");
 const tmp = join(root, "tmp");
 const expectedNative = "4eb3ecf392d78f379f7105820ff07cdfda62996ae02e7c1c1abfd463f9313019";
-const expectedTarget = "f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41";
+const expectedTarget = deterministic
+  ? "8be0a6f9f9ae5a18e2dcf65f0e0b21d0034b968c6606fb112b07133f372da299"
+  : "f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41";
 async function sha(file) {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(file)) hash.update(chunk);
@@ -94,7 +100,7 @@ try {
   assert.ok(openTool?.inputSchema?.properties?.provider_id, "REA open_binary schema missing provider_id");
   // Fail-closed negative control: the server must refuse a missing path,
   // without acquiring a target, before we select the real owned PE sample.
-  const missing=join(root,"fixtures","ghidra-pe-arithmetic",
+  const missing=join(root,"fixtures",fixtureDir,
     ".never-exists-"+process.pid+".dll");
   const rejected=await request("tools/call",
     {name:"open_binary",arguments:{path:missing,provider_id:"ghidra"}},20000);
@@ -198,6 +204,7 @@ try {
     JSON.stringify(finalSession.result,null,2)+"\n",{flag:"wx"});
   const summary={passed:true, protocolVersion:init.result.protocolVersion, toolCount:tools.length,
     toolsPassed:["open_binary","binary_overview","search_procedures","procedure_pseudo_code"],
+    fixtureKind:deterministic ? "reproducible-pe-x64" : "original-pe-x64",
     targetSha256:expectedTarget, addonSha256:expectedNative,
     overviewBytes:Buffer.byteLength(content), overviewSha256:createHash("sha256").update(content).digest("hex"),
     missingTargetRejected:true, missingProcedureRejected:true,

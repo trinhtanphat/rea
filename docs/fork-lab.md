@@ -675,6 +675,66 @@ and `finalCloseClean=true`. This verifies one complete **open /
 error recovery / close / reopen / analyze / close** cycle for the
 synthetic x64 PE, not all provider formats or arbitrary plugins.
 
+**Deterministic PE end-to-end MCP regression (2026-10-26):**
+The existing scripts/fork-lab-ghidra-mcp-smoke.mjs accepts an explicit
+--deterministic option after its fixed lab root:
+
+    C:\REA-LAB\toolchains\node-v24.22.1-win-x64\node.exe scripts\fork-lab-ghidra-mcp-smoke.mjs C:\REA-LAB --deterministic
+
+This selects only the separate 85853-byte PE fixture under
+C:\REA-LAB\fixtures\ghidra-pe-reproducible and pins its SHA-256
+8be0a6f9f9ae5a18e2dcf65f0e0b21d0034b968c6606fb112b07133f372da299.
+With no switch, the original 85850-byte fixture and SHA pin are
+unchanged. Unknown switches are rejected; the script accepts only
+the fixed C:\REA-LAB lab root.
+
+Real LocalSystem execution on WIN11-181: **PASS, exit 0**, negotiated MCP
+2025-06-18, 229 advertised tools, and successful read-only Ghidra
+open_binary, binary_overview, search_procedures and procedure_pseudo_code
+calls on the deterministic fixture. The missing-file and
+missing-procedure negative controls both returned errors, followed
+by successful recovery. Explicit close_binary, binary_session,
+reopen/second overview, and final close all passed with open=false
+and cleanup_pending=false. The summary asserts
+reopenBinaryPassed=true, finalCloseClean=true,
+searchFoundBothFunctions=true, and pseudocodeAdd7=true.
+JSON Evidence:
+C:\REA-LAB\artifacts\ghidra-mcp-real-NQbtZe\summary.json.
+The first and reopened overview Evidence files are byte-identical
+(20,280 bytes each, SHA-256
+31785f48c1d219eb4f4e1d1e9172ddd35fbfbd59b16552bf6a6e0ff1fd226ee9).
+No production MCP registration or Session 2 interaction occurred.
+
+The deterministic toolchain on PVE161 was independently rerun from
+the **current tracked C++ fixture**, SHA-256
+ddf7f6af4e9044a2adbd49224fe235e073da96dadb8308ed53faef3f56767b5f.
+Both PE outputs were byte-identical with pinned 8be0a6f9... digest,
+zero PE timestamp and ImageBase 0x180000000.
+An older separate proof binary with digest 77090dca... is **not**
+treated as interchangeable; no binary was replaced.
+
+**Default/original PE control lane, including an observed transient failure:**
+The unchanged default mode was run twice after enabling the optional
+deterministic fixture selector. In the first run, all four read-only
+Ghidra MCP calls, error recovery and first close passed, followed by
+a successful reopen; the **second binary_overview then failed** after
+127,273 ms with lost Ghidra bridge client connection / unclean
+provider close. The client timed out and exited 1. Unmodified failure
+Evidence and stderr were retained at
+C:\REA-LAB\artifacts\ghidra-mcp-real-WOThDL.
+A process/probe inspection after failure found no owned leftovers.
+**One** safe retry in a fresh stdio MCP process passed the full
+original-PE lifecycle with exit 0, preserving the original pinned
+target SHA-256
+f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41
+and native addon digest, summary:
+C:\REA-LAB\artifacts\ghidra-mcp-real-zKMhcf\summary.json.
+An invalid --unexpected option separately failed closed with exit 1.
+The first failure must not be reported as PASS. This single transient
+timeout is **not root-caused or fixed** by the successful retry; the
+Ghidra bridge's reopen path deserves further stability investigation.
+No timeout was raised or policy weakened to make the retry pass.
+
 **Remaining coverage:** a genuine non-SYSTEM Windows user token,
 real IDA/Hopper integrations, and broader target formats/architectures
 are unverified. The verified MCP scope is **these four Ghidra tools**
