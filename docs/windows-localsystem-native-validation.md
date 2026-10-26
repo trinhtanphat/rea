@@ -71,6 +71,15 @@ Returned **exit 0**, provider `rea-javascript-application`, structured Evidence 
 `c764daf2c4a3126ffe48acb7e34eb69c47799399dbcedef34ea5af18b76570e6`.
 There were no residual `rea-native-probe-*` or `rea-native-conformance-*` directories in the isolated lab temp after verification.
 
+## Side-by-side static parser regression
+
+The lab matrix on [draft PR #1](https://github.com/trinhtanphat/rea/pull/1) now accepts an explicitly selected `-CliPath` only for a REA `scripts\\rea.mjs` located under `C:\\REA-LAB`. The same six parser-only model-header / managed-.NET / PE valid-and-invalid cases were rerun on 2026-10-26 against both package copies:
+
+- **Patched** `C:\\REA-LAB\\runtime\\node_modules\\rea-agents-pr2\\scripts\\rea.mjs`: **6/6 passed**.
+- **Original** `C:\\REA-LAB\\runtime\\node_modules\\rea-agents\\scripts\\rea.mjs`: **6/6 passed**.
+
+This is 12 successful assertions, confirming no observable regression in these three specific static parser commands. It does **not** prove all providers or a normal-user SID integration.
+
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` because optional analysis engines (notably Ghidra) and registrations are **not configured** on WIN11-181. That does not contradict the separately passing native self-test and JavaScript fixture. **Do not report the entire doctor as healthy**.
