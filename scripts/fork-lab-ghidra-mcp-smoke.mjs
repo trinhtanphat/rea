@@ -92,6 +92,16 @@ try {
   const openTool = tools.find(t=>t.name==="open_binary");
   assert.ok(openTool?.inputSchema?.properties?.path, "REA open_binary schema missing path");
   assert.ok(openTool?.inputSchema?.properties?.provider_id, "REA open_binary schema missing provider_id");
+  // Fail-closed negative control: the server must refuse a missing path,
+  // without acquiring a target, before we select the real owned PE sample.
+  const missing=join(root,"fixtures","ghidra-pe-arithmetic",
+    ".never-exists-"+process.pid+".dll");
+  const rejected=await request("tools/call",
+    {name:"open_binary",arguments:{path:missing,provider_id:"ghidra"}},20000);
+  assert.ok(rejected.error || rejected.result?.isError===true,
+    "REA MCP unexpectedly accepted an absent PE fixture");
+  await writeFile(join(workspace,"rejected-missing-target.json"),
+    JSON.stringify(rejected,null,2)+"\n",{flag:"wx"});
   const open = await request("tools/call",
     {name:"open_binary",arguments:{path:target,provider_id:"ghidra"}},125000);
   assert.ok(open.result, "MCP open_binary RPC error: "+JSON.stringify(open.error));
@@ -129,7 +139,7 @@ try {
     toolsPassed:["open_binary","binary_overview","search_procedures","procedure_pseudo_code"],
     targetSha256:expectedTarget, addonSha256:expectedNative,
     overviewBytes:Buffer.byteLength(content), overviewSha256:createHash("sha256").update(content).digest("hex"),
-    searchFoundBothFunctions:true, pseudocodeAdd7:true,
+    missingTargetRejected:true, searchFoundBothFunctions:true, pseudocodeAdd7:true,
     outputDir:workspace, session2Touched:false, productionMcpConfigured:false};
   await writeFile(join(workspace,"summary.json"),JSON.stringify(summary,null,2)+"\n",{flag:"wx"});
   successful=true;

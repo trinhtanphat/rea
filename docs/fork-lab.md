@@ -441,7 +441,14 @@ then four supported **real** Ghidra MCP tool calls:
 4. `procedure_pseudo_code` for `rea_lab_add`, recovering its
    source-owned `return ... + 7;` calculation.
 
-**All four MCP calls PASS** under LocalSystem. The script verifies
+**All four MCP calls PASS** under LocalSystem. An additional
+fail-closed negative control first sends `open_binary` a unique,
+**nonexistent file path inside the lab**, requires an explicit MCP
+error, and then successfully opens/analyzes the valid PE in the
+**same server session**. This negative-then-positive chain also
+passed independently, with Evidence under
+`C:\REA-LAB\artifacts\ghidra-mcp-real-v5o70r` and
+`missingTargetRejected=true` in its summary. The script verifies
 the addon and DLL SHA-256 first; it asserts the returned Ghidra
 provenance, names, pseudocode and absence of MCP error replies. It
 stores the tool catalog, all four results, a summary and server stderr
