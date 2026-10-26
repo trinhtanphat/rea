@@ -10,6 +10,7 @@
 param(
     [string]$LabRoot = 'C:\REA-LAB',
     [string]$ManagedAssemblyPath,
+    [string]$CliPath,
     [ValidateRange(1,60)][int]$ProbeTimeoutSeconds = 45
 )
 
@@ -19,6 +20,16 @@ $ErrorActionPreference = 'Stop'
 $lab = (Resolve-Path -LiteralPath $LabRoot -ErrorAction Stop).Path
 $node = Join-Path $lab 'toolchains\node-v24.22.1-win-x64\node.exe'
 $cli = Join-Path $lab 'runtime\node_modules\rea-agents\scripts\rea.mjs'
+if (-not [string]::IsNullOrWhiteSpace($CliPath)) {
+    $resolvedCli = (Resolve-Path -LiteralPath $CliPath -ErrorAction Stop).Path
+    if (-not $resolvedCli.StartsWith($lab.TrimEnd('\') + '\',
+            [StringComparison]::OrdinalIgnoreCase) -or
+        [IO.Path]::GetFileName($resolvedCli) -ne 'rea.mjs' -or
+        [IO.Path]::GetFileName([IO.Path]::GetDirectoryName($resolvedCli)) -ne 'scripts') {
+        throw 'Only a REA CLI under the isolated lab is an acceptable test override.'
+    }
+    $cli = $resolvedCli
+}
 $artifacts = Join-Path $lab 'artifacts'
 foreach ($required in @($node, $cli, $artifacts)) {
     if (-not (Test-Path -LiteralPath $required)) {
@@ -173,6 +184,7 @@ if ($null -eq $managed.normalized_result.assembly -or
     tests = $checks
     copied_managed_assembly_sha256 = (Get-FileHash -LiteralPath $copiedDll -Algorithm SHA256).Hash.ToLowerInvariant()
     output_dir = $workspace
+    cli_path = $cli
     target_code_executed = $false
     native_decompiler_verified = $false
     javascript_graph_verified = $false

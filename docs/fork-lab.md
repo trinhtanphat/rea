@@ -135,6 +135,18 @@ After the isolated REA 6.8.0 CLI is present, run:
 
     powershell.exe -NoProfile -File .\scripts\fork-lab-static-matrix.ps1 -LabRoot C:\REA-LAB
 
+To compare with a **separate already-installed** patched REA CLI inside
+the same lab without replacing the published package, use:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-static-matrix.ps1 -LabRoot C:\REA-LAB -CliPath C:\REA-LAB\runtime\node_modules\rea-agents-pr2\scripts\rea.mjs
+
+The override is constrained to `scripts\rea.mjs` below the lab root
+and the chosen CLI path is recorded in the JSON report. On 2026-10-26
+both the original 6.8.0 CLI and isolated patched PR #2 CLI passed the
+same six static-format parser cases (**12/12 assertions overall**).
+This does not independently establish that optional analysis engines
+are configured.
+
 The script copies a locally installed stock System.Runtime.dll to an
 isolated, uniquely named directory below C:\REA-LAB\artifacts, and creates
 a synthetic 71-byte safetensors sample and two deliberately malformed
