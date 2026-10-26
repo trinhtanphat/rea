@@ -32,13 +32,14 @@ $top = @((Invoke-Git -Arguments @('rev-parse','--show-toplevel')))[0]
 if ([IO.Path]::GetFullPath($top).TrimEnd('\') -ne $repo.TrimEnd('\')) {
     throw 'Refusing to operate outside selected REA lab repository.'
 }
-$origin = @((Invoke-Git -Arguments @('remote','get-url','origin')))[0]
-$upstream = @((Invoke-Git -Arguments @('remote','get-url','upstream')))[0]
+# Git can have a distinct remote.origin.pushurl and multiple fetch/push
+# destinations. Check ALL effective endpoints, including pushInsteadOf,
+# before making even the read-only preview (or running git fetch/push).
+$originFetch = @(Invoke-Git -Arguments @('remote','get-url','--all','origin'))
+$originPush = @(Invoke-Git -Arguments @('remote','get-url','--push','--all','origin'))
+$upstreamFetch = @(Invoke-Git -Arguments @('remote','get-url','--all','upstream'))
 . (Join-Path $PSScriptRoot 'fork-lab-github-remote-guard.ps1')
-if (-not (Test-ReaGitHubRemote -Url $origin -Owner 'trinhtanphat') -or
-    -not (Test-ReaGitHubRemote -Url $upstream -Owner 'morluto')) {
-    throw 'Remote origin/upstream URLs are not exactly the expected REA GitHub host and repository.'
-}
+Assert-ReaRemoteEndpoints -OriginFetch $originFetch -OriginPush $originPush -UpstreamFetch $upstreamFetch
 $dirty = @(Invoke-Git -Arguments @('status','--porcelain'))
 if ($dirty.Count -ne 0 -and @($dirty | Where-Object { $_.Length -gt 0 }).Count -gt 0) {
     throw 'Refusing to sync from a dirty REA working tree.'
