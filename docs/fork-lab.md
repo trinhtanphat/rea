@@ -299,6 +299,47 @@ digests were checked afterward and remained unchanged. This verifies
 the artifact policy did not regress in these test cases; it is not
 a general malicious-binary sandbox or substitute for provider tests.
 
+## Ghidra 12.1.4 and JDK 21 lab archive readiness (2026-10-26)
+
+REA 6.8.0 is verified against **Ghidra 12.1.x**, with real-provider
+tests primarily using 12.1.4 and JDK 21. Ghidra 12.2 is a newer
+release but is **not substituted** for the compatibility-pinned
+12.1.4 lane. No Ghidra/JDK was installed, extracted, launched or
+added to Windows system PATH/JAVA_HOME on WIN11-181 during this stage.
+
+The official Windows x64 archive identifiers from the release providers:
+
+| Artifact | Byte length | SHA-256 |
+| --- | ---: | --- |
+| Ghidra 12.1.4 PUBLIC 20260921 ZIP | 569649598 | `ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db` |
+| Temurin full JDK 21.0.12.1+1 x64 ZIP | 205073461 | `f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e` |
+
+The JDK checksum and archive metadata came from the official
+Adoptium release API; the Ghidra checksum came from the GitHub
+release asset's published SHA-256 digest. Both downloads were
+attempted with bounded, rate-limited `curl.exe` processes and a
+dedicated `C:\REA-LAB\toolchains\downloads` directory.
+GitHub/CDN delivery was too slow for a bounded lab run; the two
+**identified lab download processes only** were stopped, and the
+incomplete archives were named `*.zip.partial` to prevent their
+use as valid packages. The existing fragments are not trusted.
+No unrelated download or browser process was terminated.
+
+`scripts/fork-lab-ghidra-archives-preflight.ps1` is a fully offline,
+read-only readiness guard that verifies exact archive lengths and
+release SHA-256 before any future extraction. It exits **2**
+whenever any input is missing, partial or invalid:
+
+    powershell.exe -NoProfile -File .\scripts\fork-lab-ghidra-archives-preflight.ps1 -LabRoot C:\REA-LAB
+
+Observed on WIN11-181: **exit 2, ready=false**. Available partial
+bytes: Ghidra 183046144 / 569649598; JDK 12480512 / 205073461.
+No extraction or Ghidra provider execution has been claimed. The
+preflight outputs an explicit JSON status, and the run's result was
+stored only under `C:\REA-LAB\artifacts`. Real Ghidra/JDK,
+normal-user token, IDA and Hopper tests are release blockers still
+open, not successes.
+
 ## Testing a repository or a program
 
 A GitHub source repository is not itself a native binary. First establish the
