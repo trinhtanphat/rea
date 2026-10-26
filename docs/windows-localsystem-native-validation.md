@@ -520,6 +520,36 @@ This is Windows LocalSystem / one x64 PE / Ghidra MCP only. A
 genuine non-SYSTEM user token and IDA/Hopper are **not validated**.
 There was no change to any live/private MCP connection.
 
+## Git remote guard confirmation after Private Commander reconnect
+
+On 2026-10-26, the WIN11-181 Private Commander tunnel recovered,
+allowing direct reconciliation of the previously locally modified
+lab files against lab PR #1's GitHub tree. Both locally modified
+guard/sync scripts were **byte-identical** to the corresponding
+remote blobs. The former six-case test source was backed up
+before a non-forced local fast-forward to the eight-case GitHub
+test. The source files were preserved in an isolated SHA-verified
+lab backup and a recovery Git stash, with the local worktree
+clean after synchronization.
+
+The real Windows PowerShell 5.1 tests were then rerun against
+the exact GitHub branch revision:
+- `fork-lab-github-remote-guard-test.ps1`: **22/22 PASS**;
+- `fork-lab-github-remote-endpoints-test.ps1`: **8/8 PASS**,
+  including malicious `insteadOf` and `pushInsteadOf` rewrites;
+- Four PowerShell lab guard/test scripts: **0 parser errors**.
+
+**30/30 Git URL / effective endpoint tests PASS on WIN11-181**.
+The latest checked isolated fixture directory is
+`C:\REA-LAB\artifacts\fork-git-endpoint-check-721d77cabf0c427e9400c24a90eb4ad1`.
+The lab PR #1 documentation was updated and pushed at
+commit `fc44640e421f46162194010ca2a2c3be840c9808`.
+
+This test protects the **lab fork synchronization utility**.
+It does not prove a non-SYSTEM caller can run the native addon,
+does not resolve optional IDA/Hopper providers, and does not
+authorize merging PR #2 into `main` or changing live services.
+
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` due **other** optional engines and registrations (such as Hopper/IDA/JADX). Ghidra 12.1.4 with JDK 21 is **now present in the isolated lab** and all Ghidra-specific scoped doctor checks are healthy, with a real PE x64 CLI analysis/search/decompile passing. **Do not report the entire wide audit as healthy**.
