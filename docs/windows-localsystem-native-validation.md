@@ -286,12 +286,83 @@ No original or patched package files were modified; the two source-addon
 SHA-256 digests were checked again afterward. No addon from these mutated
 fixtures was loaded as executable code.
 
+## Real Ghidra 12.1.4 x64 PE provider proof — WIN11-181
+
+**Newly verified (2026-10-26):** The isolated hardened Windows addon
+also works with **real Ghidra 12.1.4** and a portable 64-bit full
+Amazon Corretto JDK 21.0.13 on a synthetic source-owned PE x64 DLL.
+This goes beyond the earlier LocalSystem native controls and JavaScript
+fixture. The full repeatable regression was added to
+[lab PR #1](https://github.com/trinhtanphat/rea/pull/1),
+source commit af9cde39325235a01d65406d4dc423fb34415663.
+
+### Verified engine acquisition
+
+- NSA Ghidra 12.1.4 PUBLIC (569649598 ZIP bytes), publisher SHA-256
+  ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db.
+  The previous GitHub prefix was completed using 72 exact-range chunks
+  from a SourceForge mirror; **the full reassembled ZIP** was checked
+  against the official NSA digest before extraction.
+- Amazon Corretto JDK 21.0.13.0.10 Windows x64 full ZIP
+  (202668246 bytes), official SHA-256
+  abd264a79e07c64e19aaa705e5b8ea8db01d5213877b8ac0b855a94541a4b0fd.
+  The release checksum came from the publisher's latest_sha256
+  endpoint; digest was verified before and after the temporary,
+  one-use IP-limited transfer from PVE161 to WIN11-181.
+- Ghidra and JDK were extracted only beneath C:\REA-LAB\toolchains.
+  No system Java installation, persistent PATH or JAVA_HOME change,
+  Windows service restart or production addon replacement was made.
+- The updated offline archive preflight accepts Ghidra plus **any one**
+  of the two publisher-hash-pinned full JDK 21 ZIP options, and now
+  reports ready=true, exit 0. The old incomplete Temurin ZIP remains
+  a separate .partial file and is **not used**.
+
+### Real CLI and decompiler observations
+
+The C++ fixture source in lab PR #1 exports rea_lab_add and
+rea_lab_mix. An 85850-byte MinGW-built PE32+ Windows x64 DLL was
+transferred as a hash-checked, never-executed fixture, SHA-256
+f3b3bb1f7b97924ac6d366204152592ee2ce80a1a93061fccbf27e4524996f41.
+
+All Ghidra-specific scoped doctor checks were **healthy**, including
+the native Windows x64 decompile.exe, Ghidra 12.1.4 headless launcher,
+JDK 21 and Windows native authority. The **wide** doctor audit still
+exits nonzero due **other** unconfigured optional providers/clients;
+do not claim all providers are healthy.
+
+The source-owned Windows runner in PR #1,
+scripts/fork-lab-ghidra-real-provider.ps1, ran **all six phases
+successfully** with the source-built hardened addon:
+
+1. Exact Ghidra/JDK archive and fixture/addon checksum validation.
+2. Real public CLI analyze against the synthetic PE x64 DLL: exit 0,
+   composed workflow Evidence with **upstream provider ghidra 12.1.4**.
+3. Real public CLI symbol search: exit 0, direct ghidra Evidence
+   identifying rea_lab_add and rea_lab_mix at observed addresses.
+4. Real public CLI decompile by observed address: exit 0 and direct
+   ghidra Evidence reconstructing
+   'return param_2 + param_1 + 7;', matching the source fixture.
+5. Original DLL and native addon digests unchanged after analysis.
+6. **No residual owned Java/Node process or REA native probe**.
+
+The runner keeps environment variables scoped to each new REA
+process, uses four logical CPU cores, BelowNormal priority, Java heap
+-Xmx1024m and bounded stdout/stderr + operation timeout, and writes
+its JSON/stderr under unique C:\REA-LAB\artifacts folders. It neither
+executes the target DLL nor modifies live apps or REA installations.
+
+**Coverage boundaries:** this is actual Ghidra 12.1.4 integration
+for a small PE x64 DLL under LocalSystem. It does **not** prove
+ordinary-user Windows SID behavior, IDA/Hopper providers, all target
+formats/architectures, or full REA MCP Ghidra workflows. These
+remaining lanes stay open and both PRs remain draft.
+
 ## Remaining validation and release boundaries
 
-- `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` because optional analysis engines (notably Ghidra) and registrations are **not configured** on WIN11-181. That does not contradict the separately passing native self-test and JavaScript fixture. **Do not report the entire doctor as healthy**.
+- `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` due **other** optional engines and registrations (such as Hopper/IDA/JADX). Ghidra 12.1.4 with JDK 21 is **now present in the isolated lab** and all Ghidra-specific scoped doctor checks are healthy, with a real PE x64 CLI analysis/search/decompile passing. **Do not report the entire wide audit as healthy**.
 - The patched addon has **not** been executed under a distinct ordinary Windows user SID. A further native API proof using the real SID of an existing non-SYSTEM interactive account as an **explicit ACL trustee** returned two distinct ACEs for that SID and SYSTEM (3/3 ACL readback cases now pass). This remains a synthetic DACL case, not a native addon run under that user's token.
 - An authenticated interactive `Admin` session 2 is present on WIN11-181. An attempted direct desktop `WIN+R` input returned `SendInput inserted 0/4 events; UIPI/elevation may be blocking desktop input`. No further UI/privilege workaround was attempted. The existing user session was not altered.
 - A reusable, fail-closed non-SYSTEM conformance launcher is added as `scripts/verify-windows-normal-user-lab.ps1`. It requires an explicit isolated lab package, source verifier, Node path and artifact SHA-256, and uses the caller's normal token without changing accounts or ACLs. PowerShell 5.1 syntax check **passed** and a LocalSystem invocation was **rejected with exit 2**. Its **positive non-SYSTEM execution remains unverified**, so do not mark the normal-user requirement complete.
-- Ghidra/IDA/Hopper workflows, extended product CI, GitHub Actions and installation into a production service remain **unverified**.
+- Real **Ghidra 12.1.4 PE x64 CLI** analysis/search/decompile is now **verified** under LocalSystem only. Ghidra MCP and other target families, IDA/Hopper workflows, extended product CI, GitHub Actions and production service installation remain **unverified**.
 - The upstream Win32 5 *delete-by-handle* report (#1701) describes a different symptom and is not marked fixed by this PR.
-- **Do not merge or deploy into the live game, Private Commander, global tools or fork main merely because the LocalSystem lane passes.** Keep draft until normal-user and relevant provider regression, a reviewed diff and a deliberate merge decision.
+- **Do not merge or deploy into the live game, Private Commander, global tools or fork main merely because the LocalSystem and one real Ghidra PE x64 lane pass.** Keep draft until the genuine normal-user token test, other required provider regressions, a reviewed diff and a deliberate merge decision.
