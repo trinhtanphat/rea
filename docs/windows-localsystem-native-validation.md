@@ -1,6 +1,6 @@
 # Windows LocalSystem ACL fix — native build and verification record
 
-> Scope: fork-only draft PR #2, commit `6b3443a3b6dea831e27d8826f4650f72fd6a5d7b`, tested 2026-10-26.
+> Scope: fork-only draft PR #2. Original LocalSystem source fix `6b3443a3b6dea831e27d8826f4650f72fd6a5d7b`; tightened protected-root ACE flags in source commit `3e375a39c17118638ae3df936cb18e0bd293b673`. Tested 2026-10-26.
 > No native addon, account, service configuration, ACL, or global Node installation was changed in production.
 
 ## Issue and source patch
@@ -8,6 +8,80 @@
 The Private Commander host on WIN11-181 executes as `NT AUTHORITY\\SYSTEM` (SID `S-1-5-18`). The published REA 6.8.0 addon fails native security admission with `Private DACL contains unexpected trustees` because the unpatched verifier requires exactly two ACEs for the current user and SYSTEM, which are the same SID in this process.
 
 The independent readback proof in [draft PR #1](https://github.com/trinhtanphat/rea/pull/1) uses actual Win32 `CreateDirectoryW` and `GetFileSecurityW` APIs. Two identical SYSTEM full-control ACEs in the input returned **one** on NTFS; different SYSTEM + Administrators ACEs returned **two**. This PR's source change constructs one explicit ACE only if those principals are identical. Ordinary user accounts retain two ACEs and the native verifier still requires exact ACE count, owner, inheritance, mask, trustee and protected DACL.
+
+## Updated protected-root ACE flag hardening (code commit `3e375a39`)
+
+Further on-host ACL probes found that the **first** patched Windows addon
+(SHA-256 `2ef814532639a53f6a490bc8631db96be8c59b2e1ce48ef863dbfdaadf1e65a6`)
+admitted protected root directory DACLs with extraneous
+`NO_PROPAGATE_INHERIT_ACE` or `INHERITED_ACE` flags. Those flags
+differ from the exact `OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE`
+configuration created by REA. The previous implementation verified
+only that the necessary two inheritance flags were present.
+
+In source commit `3e375a39c17118638ae3df936cb18e0bd293b673`,
+`verifyPrivate` now requires **exactly** those two inheritance flags
+for a protected private runtime root. The existing allowance for
+non-root file/directory inheritance remains unchanged. This closes
+the two newly discovered root-policy discrepancies, without expanding
+any access rights.
+
+### Hardened second-generation Windows addon
+
+- Source commit: `3e375a39c17118638ae3df936cb18e0bd293b673`.
+- Source `filesystem.cc` Git blob verified as
+  `1c63fd0329bc8e0fb68b23dba9888e99ae531aa2` before build.
+- Isolated build on PVE161-HOST using the same staged MinGW-w64 and
+  Node.js toolchain, **repeated twice with byte-identical addon and
+  manifest** (`cmp` passed).
+- Output: REA 6.8.0 Windows x64 Node-API 8, 1,058,743 bytes.
+- Hardened addon SHA-256:
+  `4eb3ecf392d78f379f7105820ff07cdfda62996ae02e7c1c1abfd463f9313019`.
+- Hardened manifest SHA-256:
+  `9b27a8888989695b87b4d841e2d12670a36a3521eeefcd49a7380bc3164a00a0`.
+- Lab-only package: `C:\REA-LAB\runtime\node_modules\rea-agents-pr2-hardened`.
+  The original published REA addon and the first PR #2 addon remain
+  available separately with their original digests.
+- A checksum-verified ZIP was delivered via a **single-use** listener
+  restricted to WIN11-181. That listener closed after delivery.
+
+**Verified on WIN11-181 under LocalSystem using the hardened addon:**
+
+| Validation | Observed result |
+| --- | --- |
+| Expanded read-only native root ACL admission suite | **12/12 pass:** 2 admitted, 10 safely rejected |
+| Source Windows native conformance | **23 filesystem controls + 8 process checks, `ok=true`, exit 0** |
+| Official Windows native artifact manifest/PE validator | **Pass** |
+| Six static parser cases | **6/6 pass** |
+| Six artifact integrity and tamper rejection cases | **6/6 pass** |
+| Four-file synthetic Electron app analysis | **Exit 0**, `rea-javascript-application` Evidence |
+
+The expanded ACL test script is
+[`scripts/fork-lab-native-acl-negative.ps1`](https://github.com/trinhtanphat/rea/blob/chore/windows181-lab-preflight/scripts/fork-lab-native-acl-negative.ps1)
+on draft PR #1, source commit `2a82d2a`. The twelve cases include
+two valid protected SYSTEM-only/duplicate-SYSTEM fixtures and ten
+invalid fixtures: extra trustee, wrong inheritance, reduced mask,
+extra deny ACE, unprotected DACL, wrong owner, inherit-only,
+unrelated trustee, no-propagate ACE and inherited-marked ACE.
+Windows canonicalizes duplicate SYSTEM ACEs into one.
+All modified ACLs belong exclusively to newly created fixtures
+under `C:\REA-LAB\artifacts`.
+
+New conformance JSON SHA-256:
+`1baa7837282b527831784f517f9c50ce6d1c646b9cff15185ec0a460b49acc4a`.
+
+The Electron Evidence SHA-256 remains
+`c764daf2c4a3126ffe48acb7e34eb69c47799399dbcedef34ea5af18b76570e6`.
+
+The sections below record the **earlier** first-generation addon
+and remain as an audit trail. The hardened SHA is the latest tested
+candidate; do not substitute the earlier addon SHA when deploying or
+running the expanded root-flag regression.
+
+**Release limitation:** this is not a successful normal-user SID
+execution test, Ghidra/IDA/Hopper validation, a resolved wide-audit
+`rea doctor`, or CI coverage. **Keep PR #2 draft and do not deploy
+to production** pending those independent checks.
 
 ## Isolated cross-build — PVE161-HOST
 
