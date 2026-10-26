@@ -91,6 +91,31 @@ The lab matrix on [draft PR #1](https://github.com/trinhtanphat/rea/pull/1) now 
 
 This is 12 successful assertions, confirming no observable regression in these three specific static parser commands. It does **not** prove all providers or a normal-user SID integration.
 
+## Packaged native artifact verification and tamper rejection
+
+Both lab packages were checked with the **shipping REA artifact verifier**
+`scripts/verify-windows-native-artifact.mjs` (not merely an independent digest
+comparison):
+
+- Published REA 6.8.0 native addon: verifier **exit 0**.
+- Isolated patched PR #2 addon: verifier **exit 0**, `packageVersion=6.8.0`,
+  Windows x64 PE32+, Node-API 8, matching manifest SHA-256.
+
+A separate mutation matrix is committed to [lab PR #1](https://github.com/trinhtanphat/rea/pull/1)
+as `scripts/fork-lab-artifact-guards.ps1`. The matrix clones only the
+manifest, package metadata, native addon and shipping verifier into unique
+disposable lab fixtures. It verifies an intact addon passes and five
+modifications **fail closed**: fake digest, wrong package version,
+unsupported Node-API version, wrong PE machine architecture with a
+recomputed correct digest, and corrupted PE header with a recomputed
+correct digest. This tests the PE validation in addition to the hash gate.
+
+On WIN11-181 (2026-10-26), the published package passed **6/6**, and the
+isolated patched package passed **6/6** (12 assertions in total).
+No original or patched package files were modified; the two source-addon
+SHA-256 digests were checked again afterward. No addon from these mutated
+fixtures was loaded as executable code.
+
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` because optional analysis engines (notably Ghidra) and registrations are **not configured** on WIN11-181. That does not contradict the separately passing native self-test and JavaScript fixture. **Do not report the entire doctor as healthy**.
