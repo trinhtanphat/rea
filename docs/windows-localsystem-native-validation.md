@@ -16,6 +16,7 @@ The independent readback proof in [draft PR #1](https://github.com/trinhtanphat/
 - The MinGW compiler, associated libraries and Windows headers were downloaded from Debian's configured repositories and **extracted** into the staging tree via `dpkg-deb -x`. No `apt install`, package database update, Proxmox service restart or globally installed compiler.
 - Node Linux archive's SHA-256 matched the official Node.js v24.22.1 `SHASUMS256.txt`.
 - Seven downloaded source/build files were each checked against the exact Git blob SHA from fork commit `6b3443a`.
+- **Reproducible build check, 2026-10-26:** ran the same builder a second time in the same isolated MinGW/Node staging environment. `cmp` confirmed both the rebuilt `.node` binary **and `manifest.json`** were byte-for-byte identical to the first run. Addon SHA-256 stayed `2ef814532639a53f6a490bc8631db96be8c59b2e1ce48ef863dbfdaadf1e65a6`. This verifies repeatability within this environment, not across independent compiler versions.
 - Ran `node scripts/build-windows-native.mjs` with staging-only toolchain in `PATH`, `LD_LIBRARY_PATH` and `HOME`. The upstream build script fetches/verifies pinned Node 22.19.0 Node-API headers and cross-compiles the addon.
 
 Build output:
@@ -73,7 +74,9 @@ There were no residual `rea-native-probe-*` or `rea-native-conformance-*` direct
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` because optional analysis engines (notably Ghidra) and registrations are **not configured** on WIN11-181. That does not contradict the separately passing native self-test and JavaScript fixture. **Do not report the entire doctor as healthy**.
-- The patched addon has not been tested under a distinct ordinary Windows user SID.
+- The patched addon has **not** been executed under a distinct ordinary Windows user SID. A further native API proof using the real SID of an existing non-SYSTEM interactive account as an **explicit ACL trustee** returned two distinct ACEs for that SID and SYSTEM (3/3 ACL readback cases now pass). This remains a synthetic DACL case, not a native addon run under that user's token.
+- An authenticated interactive `Admin` session 2 is present on WIN11-181. An attempted direct desktop `WIN+R` input returned `SendInput inserted 0/4 events; UIPI/elevation may be blocking desktop input`. No further UI/privilege workaround was attempted. The existing user session was not altered.
+- A reusable, fail-closed non-SYSTEM conformance launcher is added as `scripts/verify-windows-normal-user-lab.ps1`. It requires an explicit isolated lab package, source verifier, Node path and artifact SHA-256, and uses the caller's normal token without changing accounts or ACLs. PowerShell 5.1 syntax check **passed** and a LocalSystem invocation was **rejected with exit 2**. Its **positive non-SYSTEM execution remains unverified**, so do not mark the normal-user requirement complete.
 - Ghidra/IDA/Hopper workflows, extended product CI, GitHub Actions and installation into a production service remain **unverified**.
 - The upstream Win32 5 *delete-by-handle* report (#1701) describes a different symptom and is not marked fixed by this PR.
 - **Do not merge or deploy into the live game, Private Commander, global tools or fork main merely because the LocalSystem lane passes.** Keep draft until normal-user and relevant provider regression, a reviewed diff and a deliberate merge decision.
