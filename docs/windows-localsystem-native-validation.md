@@ -469,6 +469,31 @@ claim normal-user or LocalService native conformance from
 these attempts. No production directory ACL, persistent account
 or interactive Session 2 setting was altered.
 
+## REA MCP decompiler recovery and provider lifecycle (PR #1 `bdfa029`)
+
+The isolated Ghidra 12.1.4 Windows PE x64 MCP runner was extended
+to cover **same-session state recovery and clean provider closure**.
+After rejecting a nonexistent DLL, the server still opened a
+valid hash-pinned PE. A later `procedure_pseudo_code` call on
+a deliberately nonexistent procedure returned an error as required;
+a subsequent call for `rea_lab_add` **successfully recovered its
+expected C pseudocode with `+7`**. The client then explicitly called
+`close_binary` and verified `binary_session` reported both
+`open=false` and `cleanup_pending=false`.
+
+These assertions passed on WIN11-181 with REA MCP protocol
+2025-06-18, Ghidra 12.1.4, portable JDK 21 and the unchanged
+hardened PR #2 addon under LocalSystem. Captured outputs:
+`C:\REA-LAB\artifacts\ghidra-mcp-real-ezWfr5`.
+The repeatable source is
+[PR #1 commit `bdfa029`](https://github.com/trinhtanphat/rea/pull/1).
+No orphaned owned Ghidra/REA process or native probe remained, and
+nothing was registered with production MCP or Session 2.
+
+This is verified **for the selected PE x64 fixture and these MCP
+operations only**, not a release proof for all advertised tools or
+a Windows non-SYSTEM identity.
+
 ## Remaining validation and release boundaries
 
 - `rea doctor` in wide audit mode still reports `healthy=false` / `environment_healthy=false` due **other** optional engines and registrations (such as Hopper/IDA/JADX). Ghidra 12.1.4 with JDK 21 is **now present in the isolated lab** and all Ghidra-specific scoped doctor checks are healthy, with a real PE x64 CLI analysis/search/decompile passing. **Do not report the entire wide audit as healthy**.
