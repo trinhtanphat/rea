@@ -261,10 +261,13 @@ static void verifyPrivate(HANDLE handle, const std::wstring& path, bool root) {
     void* rawAce;
     require(GetAce(acl, index, &rawAce), "Read private DACL entry failed", path);
     const auto ace = static_cast<ACCESS_ALLOWED_ACE*>(rawAce);
+    // A private runtime root is created with exactly OI|CI. Reject extra
+    // inherited/no-propagate flags there, while retaining the existing
+    // inheritance policy for child files and directories.
+    const BYTE rootFlags = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
     require(ace->Header.AceType == ACCESS_ALLOWED_ACE_TYPE && ace->Mask == FILE_ALL_ACCESS &&
-            (ace->Header.AceFlags & INHERIT_ONLY_ACE) == 0 &&
-            (!root || (ace->Header.AceFlags & (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)) ==
-                      (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)),
+            (root ? ace->Header.AceFlags == rootFlags
+                  : (ace->Header.AceFlags & INHERIT_ONLY_ACE) == 0),
             "Private DACL contains unsupported rights or ACE type", path, ERROR_ACCESS_DENIED);
     PSID sid = const_cast<DWORD*>(&ace->SidStart);
     if (EqualSid(sid, expected.userSid())) user = true;
