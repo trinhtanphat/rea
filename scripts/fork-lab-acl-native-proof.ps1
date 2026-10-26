@@ -9,7 +9,10 @@
   application, service, user profile or executable is modified.
 #>
 [CmdletBinding()]
-param([string]$LabRoot = 'C:\REA-LAB')
+param(
+    [string]$LabRoot = 'C:\REA-LAB',
+    [string]$AdditionalUserSid
+)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $lab = (Resolve-Path -LiteralPath $LabRoot).Path
@@ -76,6 +79,20 @@ $cases = @(
        sddl = 'O:SYG:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)';
        expectedSids = @('S-1-5-18', 'S-1-5-32-544'); expectedNativeCount = 2 }
 )
+if (-not [string]::IsNullOrWhiteSpace($AdditionalUserSid)) {
+    # A test caller may provide a real non-SYSTEM user SID without executing
+    # any process under that identity or changing any existing account/ACL.
+    $validatedSid = [Security.Principal.SecurityIdentifier]::new($AdditionalUserSid).Value
+    if ($validatedSid -eq 'S-1-5-18') {
+        throw 'AdditionalUserSid must be different from LocalSystem.'
+    }
+    $cases += @{
+        name = 'system-and-explicit-user-aces'
+        sddl = 'O:SYG:SYD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;' + $validatedSid + ')'
+        expectedSids = @('S-1-5-18', $validatedSid)
+        expectedNativeCount = 2
+    }
+}
 $measurements = @()
 foreach ($case in $cases) {
     $path = Join-Path $workspace $case.name

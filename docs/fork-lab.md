@@ -91,18 +91,26 @@ native security descriptor (not a .NET-canonicalized ACL):
   system returned **one** SYSTEM ACE.
 - In the control with SYSTEM and BUILTIN\Administrators as distinct
   input ACEs, the native API returned **two** distinct ACEs.
+- With SYSTEM plus the real non-SYSTEM SID of an existing interactive
+  account, the native API also returned **two** distinct ACEs (optional
+  `-AdditionalUserSid` argument). This uses a synthetic filesystem
+  descriptor; it **does not** run the addon as that account.
 
 The repeatable test is scripts/fork-lab-acl-native-proof.ps1, runnable
 only under LocalSystem and limited to unique empty fixture directories
 inside C:\REA-LAB\artifacts. It validates protected DACL, expected
 trustees, owner and ACE count. This reproduces the identity/ACE-count
-mechanism independently of REA, but a rebuilt addon, a passing native
-boundary verifier and an end-to-end REA doctor run are still required
-to prove any source patch fixes the product. An earlier read-only sweep
-found no surviving rea-native-probe directories under C:\Windows\Temp
-or C:\REA-LAB\tmp on the service runner. The upstream #1701 deletion
-symptom is distinct. Do not change production access controls based
-on the independent proof.
+mechanism independently of REA. A rebuilt addon on draft PR #2 now
+passes native self-test, 31 conformance checks and a four-file Electron
+fixture under LocalSystem (details in docs/windows-localsystem-native-validation.md
+on the patch branch), but an **actual normal-user addon run** remains
+unverified. The attempt to send a Run-dialog shortcut to the existing
+interactive desktop was refused by UIPI/elevation, with 0 input events
+injected; we did not work around this boundary. An earlier read-only
+sweep found no surviving rea-native-probe directories under
+C:\Windows\Temp or C:\REA-LAB\tmp. Upstream issue #1701 describes a
+distinct delete-by-handle symptom. Do not change production ACLs or
+the desktop service identity based on this research.
 ### Additional static-format probes (executed 2026-10-25)
 
 A copy of the stock .NET 8 System.Runtime.dll (43,344 bytes) was placed only
