@@ -32,7 +32,11 @@ if (process.platform !== "win32")
 // Check the expected principal independently of the PowerShell ACL observer.
 // The previous assertion compared acl.userIsSystem with itself, which could
 // pass if both the observer's identity flag and ACE count were wrong.
-const whoamiUserCsv = execFileSync("whoami.exe", ["/user", "/fo", "csv", "/nh"], {
+// Do not resolve the identity oracle through PATH or the working directory:
+// a test fixture must never be able to shadow the real Windows utility.
+const systemRoot = process.env.SystemRoot ?? process.env.windir;
+assert.ok(systemRoot, "Windows SystemRoot is required for token-SID inspection");
+const whoamiUserCsv = execFileSync(join(systemRoot, "System32", "whoami.exe"), ["/user", "/fo", "csv", "/nh"], {
   encoding: "utf8",
   windowsHide: true,
   timeout: 15_000,
